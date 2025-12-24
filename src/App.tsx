@@ -2458,38 +2458,6 @@ function App() {
     }
   };
 
-  // Generate trade report for clipboard
-  const generateTradeReport = (): string => {
-    if (!calculatedQty || !direction) return "";
-
-    const entry = parseFloat(entryPrice);
-    const sl = parseFloat(stopLoss);
-    const tp = takeProfit ? parseFloat(takeProfit) : null;
-    const slDiff = Math.abs(entry - sl);
-    const tpDiff = tp ? Math.abs(tp - entry) : null;
-    const rr = tpDiff && slDiff > 0 ? (tpDiff / slDiff).toFixed(2) : "N/A";
-
-    // Calculate EXACT risk (qty * distance to SL)
-    const exactRisk = (calculatedQty * slDiff).toFixed(2);
-
-    const lines = [
-      `${direction.toUpperCase()} ${selectedAsset}`,
-      `Entry: $${entry}`,
-      `SL: $${sl} (${direction === "long" ? "-" : "+"}${formatPriceDiff(slDiff)})`,
-    ];
-
-    if (tp) {
-      lines.push(`TP: $${tp} (${direction === "long" ? "+" : "-"}${formatPriceDiff(tpDiff!)})`);
-      lines.push(`R:R = 1:${rr}`);
-    }
-
-    lines.push(`Risk: $${exactRisk} USDT`);
-    lines.push(`Qty: ${calculatedQty} ${selectedAsset}`);
-    lines.push(`Leverage: ${leverage}x`);
-
-    return lines.join("\n");
-  };
-
   // PNL verification with iterative adjustment
   // This verifies that the expected loss at SL matches the intended risk amount
   const verifyAndAdjustPnl = (
