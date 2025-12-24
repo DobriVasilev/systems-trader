@@ -1,0 +1,21 @@
+{
+  "manifest_version": 3,
+  "name": "TradingView Bridge",
+  "version": "1.6.0",
+  "description": "Connects TradingView/Hyperliquid chart position tool to Hyperliquid Trader app",
+  "permissions": [],
+  "host_permissions": ["*://www.tradingview.com/*", "*://tradingview.com/*", "*://app.hyperliquid.xyz/*", "http://localhost:3456/*"],
+  "content_scripts": [
+    {
+      "matches": ["*://www.tradingview.com/*", "*://tradingview.com/*", "*://app.hyperliquid.xyz/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle",
+      "all_frames": true
+    }
+  ],
+  "icons": {
+    "16": "icon16.png",
+    "48": "icon48.png",
+    "128": "icon128.png"
+  }
+}

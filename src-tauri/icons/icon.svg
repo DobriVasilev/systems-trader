@@ -1,0 +1,133 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs>
+    <!-- Main gradient for the glass effect -->
+    <linearGradient id="glassGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#4FC3F7;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#2196F3;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1565C0;stop-opacity:1" />
+    </linearGradient>
+
+    <!-- Top shine gradient -->
+    <linearGradient id="shineGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#ffffff;stop-opacity:0.6" />
+      <stop offset="50%" style="stop-color:#ffffff;stop-opacity:0.1" />
+      <stop offset="100%" style="stop-color:#ffffff;stop-opacity:0" />
+    </linearGradient>
+
+    <!-- Shadow gradient -->
+    <linearGradient id="shadowGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#0D47A1;stop-opacity:0" />
+      <stop offset="100%" style="stop-color:#0D47A1;stop-opacity:0.5" />
+    </linearGradient>
+
+    <!-- Chart line gradient -->
+    <linearGradient id="chartGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#B2FF59;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#69F0AE;stop-opacity:1" />
+    </linearGradient>
+
+    <!-- Glow filter -->
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="8" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <!-- Drop shadow -->
+    <filter id="dropShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="15" stdDeviation="25" flood-color="#000" flood-opacity="0.3"/>
+    </filter>
+
+    <!-- Inner shadow for depth -->
+    <filter id="innerShadow">
+      <feOffset dx="0" dy="4"/>
+      <feGaussianBlur stdDeviation="6" result="offset-blur"/>
+      <feComposite operator="out" in="SourceGraphic" in2="offset-blur" result="inverse"/>
+      <feFlood flood-color="#0D47A1" flood-opacity="0.3" result="color"/>
+      <feComposite operator="in" in="color" in2="inverse" result="shadow"/>
+      <feComposite operator="over" in="shadow" in2="SourceGraphic"/>
+    </filter>
+  </defs>
+
+  <!-- Background rounded square with shadow -->
+  <rect x="80" y="80" width="864" height="864" rx="190" ry="190" fill="url(#glassGradient)" filter="url(#dropShadow)"/>
+
+  <!-- Inner shadow layer -->
+  <rect x="80" y="80" width="864" height="864" rx="190" ry="190" fill="url(#shadowGradient)"/>
+
+  <!-- Glass shine overlay -->
+  <path d="M270 80
+           C147 80 80 147 80 270
+           L80 450
+           Q512 550 944 450
+           L944 270
+           C944 147 877 80 754 80 Z"
+        fill="url(#shineGradient)"/>
+
+  <!-- Trading chart area background -->
+  <rect x="180" y="280" width="664" height="464" rx="40" ry="40" fill="rgba(255,255,255,0.1)"/>
+
+  <!-- Grid lines -->
+  <g stroke="rgba(255,255,255,0.15)" stroke-width="2">
+    <line x1="180" y1="400" x2="844" y2="400"/>
+    <line x1="180" y1="512" x2="844" y2="512"/>
+    <line x1="180" y1="624" x2="844" y2="624"/>
+    <line x1="346" y1="280" x2="346" y2="744"/>
+    <line x1="512" y1="280" x2="512" y2="744"/>
+    <line x1="678" y1="280" x2="678" y2="744"/>
+  </g>
+
+  <!-- Candlesticks -->
+  <g>
+    <!-- Candle 1 - Red -->
+    <line x1="260" y1="380" x2="260" y2="580" stroke="#FF5252" stroke-width="4"/>
+    <rect x="240" y="420" width="40" height="100" rx="4" fill="#FF5252"/>
+
+    <!-- Candle 2 - Green -->
+    <line x1="346" y1="350" x2="346" y2="520" stroke="#69F0AE" stroke-width="4"/>
+    <rect x="326" y="380" width="40" height="90" rx="4" fill="#69F0AE"/>
+
+    <!-- Candle 3 - Green -->
+    <line x1="432" y1="320" x2="432" y2="480" stroke="#69F0AE" stroke-width="4"/>
+    <rect x="412" y="340" width="40" height="100" rx="4" fill="#69F0AE"/>
+
+    <!-- Candle 4 - Red -->
+    <line x1="518" y1="360" x2="518" y2="540" stroke="#FF5252" stroke-width="4"/>
+    <rect x="498" y="400" width="40" height="80" rx="4" fill="#FF5252"/>
+
+    <!-- Candle 5 - Green -->
+    <line x1="604" y1="300" x2="604" y2="460" stroke="#69F0AE" stroke-width="4"/>
+    <rect x="584" y="320" width="40" height="100" rx="4" fill="#69F0AE"/>
+
+    <!-- Candle 6 - Green (big move up) -->
+    <line x1="690" y1="280" x2="690" y2="420" stroke="#69F0AE" stroke-width="4"/>
+    <rect x="670" y="300" width="40" height="80" rx="4" fill="#69F0AE"/>
+
+    <!-- Candle 7 - Green continuation -->
+    <line x1="776" y1="260" x2="776" y2="380" stroke="#69F0AE" stroke-width="4"/>
+    <rect x="756" y="280" width="40" height="60" rx="4" fill="#69F0AE"/>
+  </g>
+
+  <!-- Upward trend line with glow -->
+  <path d="M220 560 Q400 480 500 420 T780 300"
+        stroke="url(#chartGradient)"
+        stroke-width="6"
+        fill="none"
+        stroke-linecap="round"
+        filter="url(#glow)"/>
+
+  <!-- H letter stylized -->
+  <g transform="translate(512, 830)" fill="white" opacity="0.9">
+    <rect x="-80" y="-50" width="20" height="100" rx="10"/>
+    <rect x="60" y="-50" width="20" height="100" rx="10"/>
+    <rect x="-60" y="-10" width="120" height="20" rx="10"/>
+  </g>
+
+  <!-- Subtle border -->
+  <rect x="80" y="80" width="864" height="864" rx="190" ry="190"
+        fill="none"
+        stroke="rgba(255,255,255,0.3)"
+        stroke-width="2"/>
+</svg>
