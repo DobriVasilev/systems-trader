@@ -3621,7 +3621,7 @@ function App() {
             <span className="vpn-warning-icon">&#9888;</span>
             <div className="vpn-warning-text">
               <strong>VPN Required for US Users</strong>
-              <span>Hyperliquid is not available in the US. Use a VPN (Singapore/Japan recommended) to access the platform. Never disable VPN while logged in.</span>
+              <span>Hyperliquid is not available in the US. Use Mullvad VPN ($5/mo, anonymous) with Singapore or Japan servers. Never disable VPN while logged in.</span>
             </div>
           </div>
           <button
