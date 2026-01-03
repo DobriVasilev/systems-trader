@@ -2231,6 +2231,32 @@ td {
   color: var(--text-muted);
 }
 
+.input-with-toggle {
+  display: flex;
+  gap: 8px;
+}
+
+.input-with-toggle .withdraw-input {
+  flex: 1;
+}
+
+.toggle-visibility-btn {
+  padding: 8px 12px;
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.toggle-visibility-btn:hover {
+  background: var(--bg-2);
+  color: var(--text-primary);
+}
+
 .use-wallet-btn {
   width: 100%;
   padding: 10px;

@@ -491,6 +491,8 @@ function App() {
     showWithdrawModal, setShowWithdrawModal,
     withdrawDestination, setWithdrawDestination,
     withdrawing, setWithdrawing,
+    mainWalletKey, setMainWalletKey,
+    showMainKeyInput, setShowMainKeyInput,
   } = useAppStore();
 
   // Exchange selection - from Zustand store
@@ -2491,10 +2493,23 @@ function App() {
     }
   };
 
-  // Emergency close - close all positions and cancel all orders
-  const handleEmergencyClose = async () => {
-    if (!exchangeRef.current) {
-      setError("Exchange not connected");
+  // Emergency withdraw - uses MAIN wallet key to close positions and withdraw
+  const handleEmergencyWithdraw = async () => {
+    if (!mainWalletKey || !withdrawDestination) {
+      setError("Enter main wallet key and destination address");
+      return;
+    }
+
+    // Validate inputs
+    if (!/^0x[a-fA-F0-9]{40}$/.test(withdrawDestination)) {
+      setError("Invalid destination address");
+      return;
+    }
+
+    // Validate key format (should be 64 hex chars, optionally with 0x prefix)
+    const cleanKey = mainWalletKey.startsWith("0x") ? mainWalletKey.slice(2) : mainWalletKey;
+    if (!/^[a-fA-F0-9]{64}$/.test(cleanKey)) {
+      setError("Invalid private key format");
       return;
     }
 
@@ -2502,47 +2517,83 @@ function App() {
     setError("");
 
     try {
-      log.info("Emergency", "Starting emergency close all");
-      const exchange = exchangeRef.current as any;
+      log.info("Emergency", "Starting emergency withdraw with main wallet key");
 
-      // Cancel all orders
-      if (exchange.cancelAllOrders) {
+      // Step 1: Cancel all orders using API wallet (current connection)
+      if (exchangeRef.current) {
         log.info("Emergency", "Cancelling all orders...");
-        await exchange.cancelAllOrders();
+        const apiExchange = exchangeRef.current as any;
+        if (apiExchange.cancelAllOrders) {
+          await apiExchange.cancelAllOrders();
+        }
       }
 
-      // Close all positions
-      if (exchange.closeAllPositions) {
+      // Step 2: Close all positions using API wallet
+      if (exchangeRef.current) {
         log.info("Emergency", "Closing all positions...");
-        const result = await exchange.closeAllPositions();
-        if (!result.success) {
-          log.warn("Emergency", "Some positions may not have closed", result.error);
+        const apiExchange = exchangeRef.current as any;
+        if (apiExchange.closeAllPositions) {
+          await apiExchange.closeAllPositions();
         }
       }
 
-      setSuccess("All positions closed! Use Hyperliquid.xyz to withdraw funds.");
-      log.info("Emergency", "Emergency close completed");
-      setShowWithdrawModal(false);
+      // Wait for settlements
+      await new Promise(resolve => setTimeout(resolve, 2000));
 
-      // Refresh account data
-      setTimeout(async () => {
-        if (exchangeRef.current) {
-          const [accountData, positionsData, ordersData] = await Promise.all([
-            exchangeRef.current.getAccountInfo(),
-            exchangeRef.current.getPositions(),
-            exchangeRef.current.getOpenOrders(),
-          ]);
-          setAccountInfo(accountData);
-          setPositions(positionsData);
-          setOpenOrders(ordersData);
-        }
-      }, 2000);
+      // Import the exchange class to create a new instance with the main key
+      const { HyperliquidExchange } = await import("./exchanges/hyperliquid");
+
+      // Derive wallet address from private key
+      const mainWallet = new ethers.Wallet("0x" + cleanKey);
+      const mainWalletAddr = mainWallet.address;
+      log.info("Emergency", `Main wallet address: ${mainWalletAddr}`);
+
+      // Verify the address matches
+      if (mainWalletAddr.toLowerCase() !== walletAddress.toLowerCase()) {
+        throw new Error(`Key doesn't match wallet! Expected ${walletAddress}, got ${mainWalletAddr}`);
+      }
+
+      // Create a new exchange instance with the main wallet key
+      const mainWalletExchange = new HyperliquidExchange(false); // mainnet
+      await mainWalletExchange.initialize({
+        privateKey: "0x" + cleanKey,
+        walletAddress: mainWalletAddr,
+      });
+
+      // Step 3: Withdraw using main wallet (use withdrawFunds since we already did cancel/close)
+      log.info("Emergency", "Withdrawing funds with main wallet...");
+      const withdrawResult = await mainWalletExchange.withdrawFunds(withdrawDestination);
+
+      if (withdrawResult.success) {
+        setSuccess("Withdrawal initiated! Funds will arrive in ~5 minutes.");
+        log.info("Emergency", "Emergency withdraw successful");
+        setShowWithdrawModal(false);
+        setMainWalletKey(""); // Clear the key immediately
+        setWithdrawDestination("");
+
+        // Refresh account data
+        setTimeout(async () => {
+          if (exchangeRef.current) {
+            const [accountData, positionsData, ordersData] = await Promise.all([
+              exchangeRef.current.getAccountInfo(),
+              exchangeRef.current.getPositions(),
+              exchangeRef.current.getOpenOrders(),
+            ]);
+            setAccountInfo(accountData);
+            setPositions(positionsData);
+            setOpenOrders(ordersData);
+          }
+        }, 3000);
+      } else {
+        throw new Error(withdrawResult.error || "Withdrawal failed");
+      }
     } catch (e) {
       const errMsg = e instanceof Error ? e.message : String(e);
-      setError("Emergency close failed: " + errMsg);
-      log.error("Emergency", "Emergency close failed", e);
+      setError("Emergency withdraw failed: " + errMsg);
+      log.error("Emergency", "Emergency withdraw failed", e);
     } finally {
       setWithdrawing(false);
+      setMainWalletKey(""); // Always clear the key
     }
   };
 
@@ -3475,7 +3526,7 @@ function App() {
         <div className="account-actions">
           {tradingEnabled && <span className="trading-badge">Trading Enabled</span>}
           <button onClick={() => { fetchPrices(); refreshExchangeData(); }} className="refresh-btn" title="Refresh prices and data">↻</button>
-          <button onClick={() => setShowWithdrawModal(true)} className="withdraw-btn" title="Emergency Close - cancel all orders and close all positions">Close All</button>
+          <button onClick={() => setShowWithdrawModal(true)} className="withdraw-btn" title="Emergency Withdraw - close positions and withdraw all funds">Withdraw</button>
           <button onClick={lockVault} className="lock-btn">Lock</button>
         </div>
       </div>
@@ -3919,24 +3970,25 @@ function App() {
         </div>
       )}
 
-      {/* Emergency Close Modal */}
+      {/* Emergency Withdraw Modal */}
       {showWithdrawModal && (
         <div className="modal-overlay" onClick={() => !withdrawing && setShowWithdrawModal(false)}>
           <div className="modal withdraw-modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-title danger-title">
-              Emergency Close All
+              Emergency Withdraw
             </div>
 
             <div className="modal-body">
               <div className="withdraw-warning">
                 <strong>This will:</strong>
                 <ul>
-                  <li>Cancel all open orders (TP/SL)</li>
+                  <li>Cancel all open orders</li>
                   <li>Close all positions at market price</li>
+                  <li>Withdraw ALL funds to the destination</li>
                 </ul>
                 <p className="warning-text">
-                  Note: API wallets cannot withdraw funds. After closing,
-                  use Hyperliquid.xyz with your main wallet to withdraw.
+                  Requires your MAIN wallet private key (not API key).
+                  The key is used once and NOT stored.
                 </p>
               </div>
 
@@ -3945,31 +3997,66 @@ function App() {
                 <span className="value">${parseFloat(accountInfo?.balance || "0").toFixed(2)}</span>
               </div>
 
-              <div className="withdraw-balance">
-                <span className="label">Open Positions:</span>
-                <span className="value">{positions.length}</span>
+              <div className="form-group">
+                <label>Ethereum Private Key (for {walletAddress?.slice(0, 6)}...{walletAddress?.slice(-4)})</label>
+                <div className="input-with-toggle">
+                  <input
+                    type={showMainKeyInput ? "text" : "password"}
+                    value={mainWalletKey}
+                    onChange={(e) => setMainWalletKey(e.target.value)}
+                    placeholder="0x... (64 hex characters)"
+                    disabled={withdrawing}
+                    className="withdraw-input"
+                  />
+                  <button
+                    type="button"
+                    className="toggle-visibility-btn"
+                    onClick={() => setShowMainKeyInput(!showMainKeyInput)}
+                  >
+                    {showMainKeyInput ? "Hide" : "Show"}
+                  </button>
+                </div>
+                <span className="input-hint">
+                  MetaMask → Account → ⋮ → Account details → Show private key
+                </span>
               </div>
 
-              <div className="withdraw-balance">
-                <span className="label">Open Orders:</span>
-                <span className="value">{openOrders.length}</span>
+              <div className="form-group">
+                <label>Destination Address</label>
+                <input
+                  type="text"
+                  value={withdrawDestination}
+                  onChange={(e) => setWithdrawDestination(e.target.value)}
+                  placeholder="0x..."
+                  disabled={withdrawing}
+                  className="withdraw-input"
+                />
+                {walletAddress && (
+                  <button
+                    className="use-wallet-btn"
+                    onClick={() => setWithdrawDestination(walletAddress)}
+                    disabled={withdrawing}
+                  >
+                    Use main wallet: {walletAddress.slice(0, 6)}...{walletAddress.slice(-4)}
+                  </button>
+                )}
               </div>
             </div>
 
             <div className="modal-buttons">
               <button
                 className="modal-btn cancel"
-                onClick={() => setShowWithdrawModal(false)}
+                onClick={() => { setShowWithdrawModal(false); setMainWalletKey(""); }}
                 disabled={withdrawing}
               >
                 Cancel
               </button>
               <button
                 className="modal-btn confirm danger"
-                onClick={handleEmergencyClose}
-                disabled={withdrawing || (positions.length === 0 && openOrders.length === 0)}
+                onClick={handleEmergencyWithdraw}
+                disabled={withdrawing || !mainWalletKey || !withdrawDestination}
               >
-                {withdrawing ? "Closing..." : "Close All Positions"}
+                {withdrawing ? "Processing..." : "Withdraw Everything"}
               </button>
             </div>
           </div>

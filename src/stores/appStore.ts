@@ -78,6 +78,8 @@ interface AppStoreState {
   showWithdrawModal: boolean;
   withdrawDestination: string;
   withdrawing: boolean;
+  mainWalletKey: string;
+  showMainKeyInput: boolean;
 
   // Actions
   setAppState: (state: AppState) => void;
@@ -120,6 +122,8 @@ interface AppStoreState {
   setShowWithdrawModal: (show: boolean) => void;
   setWithdrawDestination: (destination: string) => void;
   setWithdrawing: (withdrawing: boolean) => void;
+  setMainWalletKey: (key: string) => void;
+  setShowMainKeyInput: (show: boolean) => void;
 
   // Clear auth state on logout
   clearAuth: () => void;
@@ -165,6 +169,8 @@ export const useAppStore = create<AppStoreState>((set) => ({
   showWithdrawModal: false,
   withdrawDestination: "",
   withdrawing: false,
+  mainWalletKey: "",
+  showMainKeyInput: false,
 
   // Actions
   setAppState: (appState) => set({ appState }),
@@ -217,6 +223,8 @@ export const useAppStore = create<AppStoreState>((set) => ({
   setShowWithdrawModal: (showWithdrawModal) => set({ showWithdrawModal }),
   setWithdrawDestination: (withdrawDestination) => set({ withdrawDestination }),
   setWithdrawing: (withdrawing) => set({ withdrawing }),
+  setMainWalletKey: (mainWalletKey) => set({ mainWalletKey }),
+  setShowMainKeyInput: (showMainKeyInput) => set({ showMainKeyInput }),
 
   clearAuth: () => set({
     sessionPassword: "",
