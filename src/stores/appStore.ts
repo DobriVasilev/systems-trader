@@ -70,6 +70,10 @@ interface AppStoreState {
   updateAvailable: { version: string; notes: string } | null;
   isUpdating: boolean;
 
+  // VPN Warning
+  showVpnWarning: boolean;
+  vpnWarningDismissed: boolean;
+
   // Actions
   setAppState: (state: AppState) => void;
   setLoading: (loading: boolean) => void;
@@ -104,6 +108,9 @@ interface AppStoreState {
 
   setUpdateAvailable: (update: { version: string; notes: string } | null) => void;
   setIsUpdating: (updating: boolean) => void;
+
+  setShowVpnWarning: (show: boolean) => void;
+  setVpnWarningDismissed: (dismissed: boolean) => void;
 
   // Clear auth state on logout
   clearAuth: () => void;
@@ -142,6 +149,9 @@ export const useAppStore = create<AppStoreState>((set) => ({
 
   updateAvailable: null,
   isUpdating: false,
+
+  showVpnWarning: false,
+  vpnWarningDismissed: false,
 
   // Actions
   setAppState: (appState) => set({ appState }),
@@ -187,6 +197,9 @@ export const useAppStore = create<AppStoreState>((set) => ({
 
   setUpdateAvailable: (updateAvailable) => set({ updateAvailable }),
   setIsUpdating: (isUpdating) => set({ isUpdating }),
+
+  setShowVpnWarning: (showVpnWarning) => set({ showVpnWarning }),
+  setVpnWarningDismissed: (vpnWarningDismissed) => set({ vpnWarningDismissed }),
 
   clearAuth: () => set({
     sessionPassword: "",

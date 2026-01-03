@@ -486,6 +486,8 @@ function App() {
     tradeHistory, setTradeHistory,
     updateAvailable, setUpdateAvailable,
     isUpdating, setIsUpdating,
+    showVpnWarning, setShowVpnWarning,
+    vpnWarningDismissed, setVpnWarningDismissed,
   } = useAppStore();
 
   // Exchange selection - from Zustand store
@@ -561,6 +563,31 @@ function App() {
   } = useSettingsStore();
 
   // App update state & TradingView Bridge state now come from useAppStore above
+
+  // VPN Warning - detect if user might be in the US based on timezone
+  useEffect(() => {
+    if (vpnWarningDismissed) return;
+
+    try {
+      const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      const isUSTimezone = timezone.startsWith("America/") &&
+        !timezone.includes("Sao_Paulo") &&
+        !timezone.includes("Buenos_Aires") &&
+        !timezone.includes("Mexico") &&
+        !timezone.includes("Toronto"); // Canada is also covered but HL works there
+
+      // Also check locale for additional signal
+      const locale = navigator.language || "";
+      const isUSLocale = locale === "en-US";
+
+      if (isUSTimezone || isUSLocale) {
+        setShowVpnWarning(true);
+        log.info("VPN", "Detected possible US location", { timezone, locale });
+      }
+    } catch (e) {
+      log.warn("VPN", "Failed to detect timezone", e);
+    }
+  }, [vpnWarningDismissed, setShowVpnWarning]);
 
   // Debug: Log overlay visibility changes
   useEffect(() => {
@@ -3583,6 +3610,29 @@ function App() {
             title="Dismiss"
           >
             ×
+          </button>
+        </div>
+      )}
+
+      {/* VPN Warning Banner for US users */}
+      {showVpnWarning && !vpnWarningDismissed && (
+        <div className="vpn-warning-banner">
+          <div className="vpn-warning-content">
+            <span className="vpn-warning-icon">&#9888;</span>
+            <div className="vpn-warning-text">
+              <strong>VPN Required for US Users</strong>
+              <span>Hyperliquid is not available in the US. Use a VPN (Singapore/Japan recommended) to access the platform. Never disable VPN while logged in.</span>
+            </div>
+          </div>
+          <button
+            onClick={() => {
+              setShowVpnWarning(false);
+              setVpnWarningDismissed(true);
+            }}
+            className="vpn-warning-dismiss"
+            title="I understand, dismiss"
+          >
+            Got it
           </button>
         </div>
       )}

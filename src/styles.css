@@ -698,6 +698,69 @@ body {
   color: white;
 }
 
+/* VPN Warning Banner */
+.vpn-warning-banner {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 24px;
+  background: linear-gradient(135deg, #DC2626 0%, #B91C1C 100%);
+  color: white;
+  font-size: 13px;
+  z-index: 10001;
+  box-shadow: 0 4px 20px rgba(220, 38, 38, 0.4);
+}
+
+.vpn-warning-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+}
+
+.vpn-warning-icon {
+  font-size: 20px;
+  line-height: 1;
+}
+
+.vpn-warning-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.vpn-warning-text strong {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.vpn-warning-text span {
+  opacity: 0.9;
+  font-size: 12px;
+}
+
+.vpn-warning-dismiss {
+  padding: 8px 16px;
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 6px;
+  color: white;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.vpn-warning-dismiss:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
 /* ==================== DASHBOARD ==================== */
 .app-container {
   min-height: 100vh;
