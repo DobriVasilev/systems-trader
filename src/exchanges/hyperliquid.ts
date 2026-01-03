@@ -541,6 +541,185 @@ export class HyperliquidExchange implements Exchange {
       return { success: false, error: e instanceof Error ? e.message : String(e) };
     }
   }
+
+  // Close all positions at market
+  async closeAllPositions(): Promise<OrderResult> {
+    if (!this.wallet) {
+      return { success: false, error: "Wallet not initialized" };
+    }
+
+    try {
+      const positions = await this.getPositions();
+      if (positions.length === 0) {
+        return { success: true }; // No positions to close
+      }
+
+      const errors: string[] = [];
+      for (const pos of positions) {
+        const assetId = this.assetMap.get(pos.symbol);
+        if (assetId === undefined) {
+          errors.push(`Asset ${pos.symbol} not found`);
+          continue;
+        }
+
+        const timestamp = Date.now();
+        const size = parseFloat(pos.size);
+        const szDecimals = this.assetDecimals.get(pos.symbol) || 4;
+        const isLong = pos.side === "long";
+
+        // Get current price for market order
+        const prices = await this.getMarketPrices();
+        const currentPrice = prices[pos.symbol] || 0;
+        // Slippage: 1% worse price for market order
+        const slippagePrice = isLong ? currentPrice * 0.99 : currentPrice * 1.01;
+
+        const orderWire = {
+          a: assetId,
+          b: !isLong, // Opposite direction to close
+          p: formatHyperliquidPrice(slippagePrice),
+          s: size.toFixed(szDecimals),
+          r: true, // Reduce only
+          t: { limit: { tif: "Ioc" } }, // Immediate or cancel
+        };
+
+        const action = {
+          type: "order",
+          orders: [orderWire],
+          grouping: "na",
+        };
+
+        const signature = await this.signAction(action, timestamp);
+
+        const response = await fetch(this.exchangeApi, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action,
+            nonce: timestamp,
+            signature,
+          }),
+        });
+
+        const result = await response.json();
+        if (result.status !== "ok") {
+          errors.push(`Failed to close ${pos.symbol}: ${JSON.stringify(result.response)}`);
+        }
+      }
+
+      if (errors.length > 0) {
+        return { success: false, error: errors.join("; ") };
+      }
+      return { success: true };
+    } catch (e) {
+      return { success: false, error: e instanceof Error ? e.message : String(e) };
+    }
+  }
+
+  // Emergency withdraw - closes positions, cancels orders, withdraws all funds
+  // This works even if the UI is blocked (flagged account)
+  async emergencyWithdraw(destination: string, amount?: string): Promise<OrderResult> {
+    if (!this.wallet) {
+      return { success: false, error: "Wallet not initialized" };
+    }
+
+    try {
+      console.log("[Hyperliquid] Starting emergency withdrawal...");
+
+      // Step 1: Cancel all open orders
+      console.log("[Hyperliquid] Cancelling all orders...");
+      await this.cancelAllOrders();
+
+      // Step 2: Close all positions
+      console.log("[Hyperliquid] Closing all positions...");
+      const closeResult = await this.closeAllPositions();
+      if (!closeResult.success) {
+        console.warn("[Hyperliquid] Some positions may not have closed:", closeResult.error);
+      }
+
+      // Wait a moment for settlements
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      // Step 3: Get available balance
+      const accountInfo = await this.getAccountInfo();
+      const availableBalance = parseFloat(accountInfo.available);
+
+      if (availableBalance <= 1) {
+        return { success: false, error: "Insufficient balance to withdraw (need > $1 for fee)" };
+      }
+
+      // Calculate withdraw amount (leave $1 for fee, or use specified amount)
+      const withdrawAmount = amount
+        ? Math.min(parseFloat(amount), availableBalance - 1)
+        : availableBalance - 1;
+
+      if (withdrawAmount <= 0) {
+        return { success: false, error: "Nothing to withdraw after fees" };
+      }
+
+      console.log("[Hyperliquid] Withdrawing", withdrawAmount, "USDC to", destination);
+
+      // Step 4: Withdraw via bridge
+      const timestamp = Date.now();
+
+      // Withdrawal uses different signature - EIP-712 on Arbitrum (chain ID 42161 = 0xa4b1)
+      const withdrawAction = {
+        type: "withdraw3",
+        hyperliquidChain: this.isMainnet ? "Mainnet" : "Testnet",
+        signatureChainId: "0xa4b1", // Arbitrum
+        destination: destination,
+        amount: withdrawAmount.toFixed(2),
+        time: timestamp,
+      };
+
+      // Sign the withdrawal action with Arbitrum domain
+      const WITHDRAW_DOMAIN = {
+        name: "HyperliquidSignTransaction",
+        version: "1",
+        chainId: 42161, // Arbitrum
+        verifyingContract: "0x0000000000000000000000000000000000000000",
+      };
+
+      const WITHDRAW_TYPES = {
+        HyperliquidTransaction: [
+          { name: "action", type: "string" },
+          { name: "nonce", type: "uint64" },
+        ],
+      };
+
+      const withdrawMessage = {
+        action: JSON.stringify(withdrawAction),
+        nonce: timestamp,
+      };
+
+      const rawSignature = await this.wallet.signTypedData(WITHDRAW_DOMAIN, WITHDRAW_TYPES, withdrawMessage);
+      const { r, s, v } = ethers.Signature.from(rawSignature);
+
+      const response = await fetch(this.exchangeApi, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: withdrawAction,
+          nonce: timestamp,
+          signature: { r, s, v },
+        }),
+      });
+
+      const result = await response.json();
+
+      if (result.status === "ok") {
+        console.log("[Hyperliquid] Withdrawal initiated! Funds will arrive in ~5 minutes.");
+        return {
+          success: true,
+          orderId: `withdraw-${timestamp}`,
+        };
+      } else {
+        return { success: false, error: result.response || JSON.stringify(result) };
+      }
+    } catch (e) {
+      console.error("[Hyperliquid] Emergency withdrawal failed:", e);
+      return { success: false, error: e instanceof Error ? e.message : String(e) };
+    }
+  }
 }
 
 // Factory function

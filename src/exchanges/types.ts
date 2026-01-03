@@ -139,6 +139,7 @@ export interface Exchange {
   cancelOrder(params: CancelOrderParams): Promise<boolean>;
   cancelAllOrders(asset?: string): Promise<boolean>;
   closePosition?(asset: string): Promise<OrderResult>;  // Close entire position for asset
+  emergencyWithdraw?(destination: string, amount: string): Promise<OrderResult>;  // Emergency withdraw all funds
 
   // Leverage
   setLeverage(asset: string, leverage: number): Promise<boolean>;
