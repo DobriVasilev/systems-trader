@@ -74,6 +74,11 @@ interface AppStoreState {
   showVpnWarning: boolean;
   vpnWarningDismissed: boolean;
 
+  // Emergency Withdraw
+  showWithdrawModal: boolean;
+  withdrawDestination: string;
+  withdrawing: boolean;
+
   // Actions
   setAppState: (state: AppState) => void;
   setLoading: (loading: boolean) => void;
@@ -111,6 +116,10 @@ interface AppStoreState {
 
   setShowVpnWarning: (show: boolean) => void;
   setVpnWarningDismissed: (dismissed: boolean) => void;
+
+  setShowWithdrawModal: (show: boolean) => void;
+  setWithdrawDestination: (destination: string) => void;
+  setWithdrawing: (withdrawing: boolean) => void;
 
   // Clear auth state on logout
   clearAuth: () => void;
@@ -152,6 +161,10 @@ export const useAppStore = create<AppStoreState>((set) => ({
 
   showVpnWarning: false,
   vpnWarningDismissed: false,
+
+  showWithdrawModal: false,
+  withdrawDestination: "",
+  withdrawing: false,
 
   // Actions
   setAppState: (appState) => set({ appState }),
@@ -200,6 +213,10 @@ export const useAppStore = create<AppStoreState>((set) => ({
 
   setShowVpnWarning: (showVpnWarning) => set({ showVpnWarning }),
   setVpnWarningDismissed: (vpnWarningDismissed) => set({ vpnWarningDismissed }),
+
+  setShowWithdrawModal: (showWithdrawModal) => set({ showWithdrawModal }),
+  setWithdrawDestination: (withdrawDestination) => set({ withdrawDestination }),
+  setWithdrawing: (withdrawing) => set({ withdrawing }),
 
   clearAuth: () => set({
     sessionPassword: "",

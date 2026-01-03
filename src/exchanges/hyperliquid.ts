@@ -326,6 +326,12 @@ export class HyperliquidExchange implements Exchange {
 
       if (result.status === "ok") {
         const statuses = result.response?.data?.statuses;
+
+        // Check if order was rejected (ALO orders get rejected if they would cross)
+        if (statuses?.[0]?.error) {
+          return { success: false, error: statuses[0].error };
+        }
+
         const orderId = statuses?.[0]?.resting?.oid || statuses?.[0]?.filled?.oid;
         return {
           success: true,

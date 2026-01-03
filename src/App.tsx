@@ -488,6 +488,9 @@ function App() {
     isUpdating, setIsUpdating,
     showVpnWarning, setShowVpnWarning,
     vpnWarningDismissed, setVpnWarningDismissed,
+    showWithdrawModal, setShowWithdrawModal,
+    withdrawDestination, setWithdrawDestination,
+    withdrawing, setWithdrawing,
   } = useAppStore();
 
   // Exchange selection - from Zustand store
@@ -1191,7 +1194,7 @@ function App() {
         isBuy,
         size: parseFloat(size),
         price: parseFloat(price),
-        postOnly: !isMarket,
+        postOnly: false, // Use Gtc (Good Till Cancel) for all orders - ALO is too restrictive
       });
 
       if (result.success) {
@@ -2488,6 +2491,61 @@ function App() {
     }
   };
 
+  // Emergency close - close all positions and cancel all orders
+  const handleEmergencyClose = async () => {
+    if (!exchangeRef.current) {
+      setError("Exchange not connected");
+      return;
+    }
+
+    setWithdrawing(true);
+    setError("");
+
+    try {
+      log.info("Emergency", "Starting emergency close all");
+      const exchange = exchangeRef.current as any;
+
+      // Cancel all orders
+      if (exchange.cancelAllOrders) {
+        log.info("Emergency", "Cancelling all orders...");
+        await exchange.cancelAllOrders();
+      }
+
+      // Close all positions
+      if (exchange.closeAllPositions) {
+        log.info("Emergency", "Closing all positions...");
+        const result = await exchange.closeAllPositions();
+        if (!result.success) {
+          log.warn("Emergency", "Some positions may not have closed", result.error);
+        }
+      }
+
+      setSuccess("All positions closed! Use Hyperliquid.xyz to withdraw funds.");
+      log.info("Emergency", "Emergency close completed");
+      setShowWithdrawModal(false);
+
+      // Refresh account data
+      setTimeout(async () => {
+        if (exchangeRef.current) {
+          const [accountData, positionsData, ordersData] = await Promise.all([
+            exchangeRef.current.getAccountInfo(),
+            exchangeRef.current.getPositions(),
+            exchangeRef.current.getOpenOrders(),
+          ]);
+          setAccountInfo(accountData);
+          setPositions(positionsData);
+          setOpenOrders(ordersData);
+        }
+      }, 2000);
+    } catch (e) {
+      const errMsg = e instanceof Error ? e.message : String(e);
+      setError("Emergency close failed: " + errMsg);
+      log.error("Emergency", "Emergency close failed", e);
+    } finally {
+      setWithdrawing(false);
+    }
+  };
+
   // Send trade data to Google Sheets webhook
   const sendToGoogleSheets = async (tradeData: Record<string, any>) => {
     if (!googleSheetsUrl) return;
@@ -3400,23 +3458,24 @@ function App() {
       <div className="account-bar">
         <div className="account-stat">
           <span className="stat-label">Balance</span>
-          <span className="stat-value">${accountInfo?.balance || "0.00"}</span>
+          <span className="stat-value">${parseFloat(accountInfo?.balance || "0").toFixed(2)}</span>
         </div>
         <div className="account-stat">
           <span className="stat-label">Available</span>
-          <span className="stat-value">${accountInfo?.available || "0.00"}</span>
+          <span className="stat-value">${parseFloat(accountInfo?.available || "0").toFixed(2)}</span>
         </div>
         <div className="account-stat">
           <span className="stat-label">Margin Used</span>
-          <span className="stat-value">${accountInfo?.totalMarginUsed || "0.00"}</span>
+          <span className="stat-value">${parseFloat(accountInfo?.totalMarginUsed || "0").toFixed(2)}</span>
         </div>
         <div className="account-stat">
           <span className="stat-label">Position Value</span>
-          <span className="stat-value">${accountInfo?.totalPositionValue || "0.00"}</span>
+          <span className="stat-value">${parseFloat(accountInfo?.totalPositionValue || "0").toFixed(2)}</span>
         </div>
         <div className="account-actions">
           {tradingEnabled && <span className="trading-badge">Trading Enabled</span>}
           <button onClick={() => { fetchPrices(); refreshExchangeData(); }} className="refresh-btn" title="Refresh prices and data">↻</button>
+          <button onClick={() => setShowWithdrawModal(true)} className="withdraw-btn" title="Emergency Close - cancel all orders and close all positions">Close All</button>
           <button onClick={lockVault} className="lock-btn">Lock</button>
         </div>
       </div>
@@ -3854,6 +3913,63 @@ function App() {
                 disabled={!retryEntryPrice}
               >
                 Retry at ${retryEntryPrice || "---"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Emergency Close Modal */}
+      {showWithdrawModal && (
+        <div className="modal-overlay" onClick={() => !withdrawing && setShowWithdrawModal(false)}>
+          <div className="modal withdraw-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-title danger-title">
+              Emergency Close All
+            </div>
+
+            <div className="modal-body">
+              <div className="withdraw-warning">
+                <strong>This will:</strong>
+                <ul>
+                  <li>Cancel all open orders (TP/SL)</li>
+                  <li>Close all positions at market price</li>
+                </ul>
+                <p className="warning-text">
+                  Note: API wallets cannot withdraw funds. After closing,
+                  use Hyperliquid.xyz with your main wallet to withdraw.
+                </p>
+              </div>
+
+              <div className="withdraw-balance">
+                <span className="label">Current Balance:</span>
+                <span className="value">${parseFloat(accountInfo?.balance || "0").toFixed(2)}</span>
+              </div>
+
+              <div className="withdraw-balance">
+                <span className="label">Open Positions:</span>
+                <span className="value">{positions.length}</span>
+              </div>
+
+              <div className="withdraw-balance">
+                <span className="label">Open Orders:</span>
+                <span className="value">{openOrders.length}</span>
+              </div>
+            </div>
+
+            <div className="modal-buttons">
+              <button
+                className="modal-btn cancel"
+                onClick={() => setShowWithdrawModal(false)}
+                disabled={withdrawing}
+              >
+                Cancel
+              </button>
+              <button
+                className="modal-btn confirm danger"
+                onClick={handleEmergencyClose}
+                disabled={withdrawing || (positions.length === 0 && openOrders.length === 0)}
+              >
+                {withdrawing ? "Closing..." : "Close All Positions"}
               </button>
             </div>
           </div>
