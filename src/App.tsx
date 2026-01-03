@@ -564,25 +564,28 @@ function App() {
 
   // App update state & TradingView Bridge state now come from useAppStore above
 
-  // VPN Warning - detect if user might be in the US based on timezone
+  // VPN Warning - detect if user is in the US based on timezone only
+  // (not locale - many non-US users have en-US locale)
   useEffect(() => {
     if (vpnWarningDismissed) return;
 
     try {
       const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-      const isUSTimezone = timezone.startsWith("America/") &&
-        !timezone.includes("Sao_Paulo") &&
-        !timezone.includes("Buenos_Aires") &&
-        !timezone.includes("Mexico") &&
-        !timezone.includes("Toronto"); // Canada is also covered but HL works there
 
-      // Also check locale for additional signal
-      const locale = navigator.language || "";
-      const isUSLocale = locale === "en-US";
+      // Only specific US timezones trigger warning
+      const usTimezones = [
+        "America/New_York", "America/Chicago", "America/Denver",
+        "America/Los_Angeles", "America/Phoenix", "America/Anchorage",
+        "America/Honolulu", "America/Detroit", "America/Indiana",
+        "America/Kentucky", "America/Boise", "America/Juneau",
+        "Pacific/Honolulu",
+      ];
 
-      if (isUSTimezone || isUSLocale) {
+      const isUSTimezone = usTimezones.some(tz => timezone.startsWith(tz));
+
+      if (isUSTimezone) {
         setShowVpnWarning(true);
-        log.info("VPN", "Detected possible US location", { timezone, locale });
+        log.info("VPN", "Detected US timezone", { timezone });
       }
     } catch (e) {
       log.warn("VPN", "Failed to detect timezone", e);
