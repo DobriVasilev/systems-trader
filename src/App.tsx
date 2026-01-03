@@ -2691,24 +2691,65 @@ function App() {
     setRetryEntryPrice("");
   };
 
+  // VPN Warning Modal - shows on ALL screens for US users
+  const VpnWarningModal = () => {
+    if (!showVpnWarning || vpnWarningDismissed) return null;
+    return (
+      <div className="vpn-modal-overlay">
+        <div className="vpn-modal">
+          <div className="vpn-modal-icon">⚠️</div>
+          <h2>VPN Required</h2>
+          <p className="vpn-modal-main">
+            Your timezone indicates you may be in the <strong>United States</strong>.
+          </p>
+          <p className="vpn-modal-detail">
+            Hyperliquid is <strong>not available</strong> to US users. To access the platform:
+          </p>
+          <ul className="vpn-modal-list">
+            <li>Use a VPN (we recommend <strong>Mullvad</strong> - $5/mo, anonymous)</li>
+            <li>Connect to <strong>Singapore</strong> or <strong>Japan</strong> servers</li>
+            <li><strong>Never disable VPN</strong> while logged in to Hyperliquid</li>
+          </ul>
+          <p className="vpn-modal-warning">
+            If your account gets flagged, you can still withdraw funds using the Emergency Withdraw feature in Settings.
+          </p>
+          <button
+            className="vpn-modal-btn"
+            onClick={() => {
+              setShowVpnWarning(false);
+              setVpnWarningDismissed(true);
+            }}
+          >
+            I understand, continue
+          </button>
+        </div>
+      </div>
+    );
+  };
+
   // Loading state
   if (appState === "loading") {
     return (
-      <AuthLayout title="Loading" subtitle="Initializing secure vault...">
-        <div style={{ textAlign: "center", padding: "40px 0" }}>
-          <div className="biometric-icon" style={{ margin: "0 auto 16px" }}>
-            <TrendingIcon />
+      <>
+        <VpnWarningModal />
+        <AuthLayout title="Loading" subtitle="Initializing secure vault...">
+          <div style={{ textAlign: "center", padding: "40px 0" }}>
+            <div className="biometric-icon" style={{ margin: "0 auto 16px" }}>
+              <TrendingIcon />
+            </div>
+            <p style={{ color: "var(--text-muted)" }}>Please wait...</p>
           </div>
-          <p style={{ color: "var(--text-muted)" }}>Please wait...</p>
-        </div>
-      </AuthLayout>
+        </AuthLayout>
+      </>
     );
   }
 
   // Biometric prompt (Touch ID)
   if (appState === "biometric_prompt") {
     return (
-      <AuthLayout
+      <>
+        <VpnWarningModal />
+        <AuthLayout
         title="Touch ID"
         subtitle="Use biometrics to unlock your vault"
         heroTitle="Welcome back,"
@@ -2734,13 +2775,16 @@ function App() {
         </div>
         {error && <div className="error-message">{error}</div>}
       </AuthLayout>
+      </>
     );
   }
 
   // Setup password screen
   if (appState === "setup_password") {
     return (
-      <AuthLayout
+      <>
+        <VpnWarningModal />
+        <AuthLayout
         title="Create Your Vault"
         subtitle="Set up a password to protect your trading keys"
         heroTitle="Trade smarter,"
@@ -2800,13 +2844,16 @@ function App() {
 
         {error && <div className="error-message">{error}</div>}
       </AuthLayout>
+      </>
     );
   }
 
   // Unlock screen
   if (appState === "unlock") {
     return (
-      <AuthLayout
+      <>
+        <VpnWarningModal />
+        <AuthLayout
         title="Welcome Back"
         subtitle={biometricFailed ? "Touch ID failed. Enter your password." : "Enter your password to unlock"}
         heroTitle="Welcome back,"
@@ -2860,6 +2907,7 @@ function App() {
 
         {error && <div className="error-message">{error}</div>}
       </AuthLayout>
+      </>
     );
   }
 
@@ -2868,7 +2916,9 @@ function App() {
     const exchangeConfig = EXCHANGE_CONFIGS[selectedExchange];
 
     return (
-      <AuthLayout
+      <>
+        <VpnWarningModal />
+        <AuthLayout
         title="Connect Wallet"
         subtitle={`Connect to ${exchangeConfig.name} to start trading`}
         heroTitle="Almost there,"
@@ -2957,6 +3007,7 @@ function App() {
 
         {error && <div className="error-message">{error}</div>}
       </AuthLayout>
+      </>
     );
   }
 
@@ -3727,28 +3778,8 @@ function App() {
         </div>
       )}
 
-      {/* VPN Warning Banner for US users */}
-      {showVpnWarning && !vpnWarningDismissed && (
-        <div className="vpn-warning-banner">
-          <div className="vpn-warning-content">
-            <span className="vpn-warning-icon">&#9888;</span>
-            <div className="vpn-warning-text">
-              <strong>VPN Required for US Users</strong>
-              <span>Hyperliquid is not available in the US. Use Mullvad VPN ($5/mo, anonymous) with Singapore or Japan servers. Never disable VPN while logged in.</span>
-            </div>
-          </div>
-          <button
-            onClick={() => {
-              setShowVpnWarning(false);
-              setVpnWarningDismissed(true);
-            }}
-            className="vpn-warning-dismiss"
-            title="I understand, dismiss"
-          >
-            Got it
-          </button>
-        </div>
-      )}
+      {/* VPN Warning Modal - shows on all screens */}
+      <VpnWarningModal />
 
       {sidebarPosition === "left" ? (
         <>

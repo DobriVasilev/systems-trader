@@ -3477,3 +3477,99 @@ td {
 .exchange-option.active .exchange-fee {
   color: var(--text-secondary);
 }
+
+/* ==================== VPN WARNING MODAL ==================== */
+.vpn-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  padding: 20px;
+  backdrop-filter: blur(8px);
+}
+
+.vpn-modal {
+  background: var(--bg-2);
+  border: 1px solid var(--warning);
+  border-radius: 16px;
+  padding: 32px;
+  max-width: 480px;
+  width: 100%;
+  text-align: center;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5), 0 0 40px rgba(245, 158, 11, 0.1);
+}
+
+.vpn-modal-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+
+.vpn-modal h2 {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--warning);
+  margin-bottom: 16px;
+}
+
+.vpn-modal-main {
+  font-size: 16px;
+  color: var(--text-primary);
+  margin-bottom: 12px;
+}
+
+.vpn-modal-detail {
+  font-size: 14px;
+  color: var(--text-secondary);
+  margin-bottom: 16px;
+}
+
+.vpn-modal-list {
+  text-align: left;
+  padding-left: 24px;
+  margin-bottom: 20px;
+}
+
+.vpn-modal-list li {
+  font-size: 14px;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+  line-height: 1.5;
+}
+
+.vpn-modal-list li strong {
+  color: var(--text-primary);
+}
+
+.vpn-modal-warning {
+  font-size: 13px;
+  color: var(--text-muted);
+  background: var(--bg-3);
+  padding: 12px 16px;
+  border-radius: 8px;
+  margin-bottom: 24px;
+  border-left: 3px solid var(--success);
+}
+
+.vpn-modal-btn {
+  width: 100%;
+  padding: 14px 24px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #000;
+  background: var(--warning);
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.vpn-modal-btn:hover {
+  background: #d97706;
+  transform: translateY(-1px);
+}
