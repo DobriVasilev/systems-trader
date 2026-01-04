@@ -52,7 +52,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEJBQ0JEQ0I2NTBEODg2OEUKUldTT2h0aFF0dHpMdWhKVEoxZXhSYStPVGYxL2Z4dDF2czRVNmw2OWNnNnFUVnM5bmJENjJqekoK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEExNTI5RjdBNjE3NjNCOUUKUldTZU8zWmhlcDlTb2RTL1BHVkd5d1U3NjVRd2FpdE1hakJ3MWJ6TWhvenovTThpd3g1TWdVK2gK",
       "endpoints": [
         "https://github.com/DobriVasilev/hyperliquid-trader/releases/latest/download/latest.json"
       ],
