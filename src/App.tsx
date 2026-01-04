@@ -1912,7 +1912,8 @@ function App() {
 
     if (biometricAvailable) {
       setAppState("biometric_prompt");
-      retryBiometric();
+      // Delay biometric prompt to let UI show lock screen first
+      setTimeout(() => retryBiometric(), 300);
     } else {
       setAppState("unlock");
     }
