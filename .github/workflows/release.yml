@@ -110,10 +110,10 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: |
-          # Write key to file for tauri signer
-          echo "$TAURI_SIGNING_PRIVATE_KEY" > /tmp/private.key
+          # Clean the key (remove any whitespace) and pass directly
+          CLEAN_KEY=$(printf '%s' "$TAURI_SIGNING_PRIVATE_KEY" | tr -d '\n\r\t ')
           curl -sL "https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/Hyperliquid.Trader_aarch64.app.tar.gz" -o /tmp/aarch64.tar.gz
-          tauri signer sign -f /tmp/private.key -p "$TAURI_SIGNING_PRIVATE_KEY_PASSWORD" /tmp/aarch64.tar.gz
+          tauri signer sign -k "$CLEAN_KEY" -p "$TAURI_SIGNING_PRIVATE_KEY_PASSWORD" /tmp/aarch64.tar.gz
           AARCH64_SIG=$(cat /tmp/aarch64.tar.gz.sig)
           echo "AARCH64_SIG=$AARCH64_SIG" >> $GITHUB_ENV
 
@@ -122,12 +122,11 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: |
+          CLEAN_KEY=$(printf '%s' "$TAURI_SIGNING_PRIVATE_KEY" | tr -d '\n\r\t ')
           curl -sL "https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/Hyperliquid.Trader_x64.app.tar.gz" -o /tmp/x64.tar.gz
-          tauri signer sign -f /tmp/private.key -p "$TAURI_SIGNING_PRIVATE_KEY_PASSWORD" /tmp/x64.tar.gz
+          tauri signer sign -k "$CLEAN_KEY" -p "$TAURI_SIGNING_PRIVATE_KEY_PASSWORD" /tmp/x64.tar.gz
           X64_SIG=$(cat /tmp/x64.tar.gz.sig)
           echo "X64_SIG=$X64_SIG" >> $GITHUB_ENV
-          # Clean up key file
-          rm /tmp/private.key
 
       - name: Create latest.json
         run: |
