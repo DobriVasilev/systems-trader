@@ -62,36 +62,41 @@ fn authenticate_biometric(reason: String) -> BiometricResult {
         };
     }
 
-    // Use Swift script for Touch ID - AppleScript-ObjC bridge doesn't handle async well
-    let swift_code = format!(
+    // Use JXA (JavaScript for Automation) which handles ObjC async better than AppleScript
+    let jxa_code = format!(
         r#"
-import LocalAuthentication
-import Foundation
+ObjC.import('LocalAuthentication');
+ObjC.import('Foundation');
 
-let context = LAContext()
-var error: NSError?
+var context = $.LAContext.alloc.init;
+var error = Ref();
 
-guard context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error) else {{
-    print("unavailable")
-    exit(0)
+if (!context.canEvaluatePolicyError($.LAPolicyDeviceOwnerAuthenticationWithBiometrics, error)) {{
+    'unavailable';
+}} else {{
+    var result = 'pending';
+    context.evaluatePolicyLocalizedReasonReply(
+        $.LAPolicyDeviceOwnerAuthenticationWithBiometrics,
+        "{}",
+        function(success, authError) {{
+            result = success ? 'success' : 'failed';
+        }}
+    );
+    // Wait for callback (JXA handles this synchronously for ObjC callbacks)
+    delay(0.1);
+    var timeout = 60;
+    while (result === 'pending' && timeout > 0) {{
+        delay(0.5);
+        timeout -= 0.5;
+    }}
+    result;
 }}
-
-let semaphore = DispatchSemaphore(value: 0)
-var authSuccess = false
-
-context.evaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, localizedReason: "{}") {{ success, _ in
-    authSuccess = success
-    semaphore.signal()
-}}
-
-semaphore.wait()
-print(authSuccess ? "success" : "failed")
 "#,
-        reason.replace("\"", "\\\"")
+        reason.replace("\"", "\\\"").replace("'", "\\'")
     );
 
-    let output = Command::new("swift")
-        .args(["-e", &swift_code])
+    let output = Command::new("osascript")
+        .args(["-l", "JavaScript", "-e", &jxa_code])
         .output();
 
     match output {
@@ -112,13 +117,12 @@ print(authSuccess ? "success" : "failed")
                     error: Some("Touch ID not available".to_string()),
                 }
             } else {
-                // Include more debug info
                 let error_msg = if !stderr.is_empty() {
-                    format!("Touch ID failed: {}", stderr)
-                } else if !result.is_empty() {
-                    format!("Touch ID returned: {}", result)
-                } else {
+                    format!("Touch ID error: {}", stderr)
+                } else if result == "failed" {
                     "Touch ID cancelled or failed".to_string()
+                } else {
+                    format!("Touch ID returned: {}", result)
                 };
                 BiometricResult {
                     success: false,
@@ -135,24 +139,158 @@ print(authSuccess ? "success" : "failed")
     }
 }
 
-// Non-macOS fallback
-#[cfg(not(target_os = "macos"))]
+// ============ Windows Hello Implementation ============
+#[cfg(target_os = "windows")]
 #[tauri::command]
 fn check_biometric_available() -> BiometricResult {
-    BiometricResult {
-        success: true,
-        available: false,
-        error: Some("Biometrics only available on macOS".to_string()),
+    use std::process::Command;
+
+    // Check if Windows Hello is available using PowerShell
+    let output = Command::new("powershell")
+        .args(["-Command", r#"
+            Add-Type -AssemblyName System.Runtime.WindowsRuntime
+            $null = [Windows.Security.Credentials.UI.UserConsentVerifier,Windows.Security.Credentials.UI,ContentType=WindowsRuntime]
+            $result = [Windows.Security.Credentials.UI.UserConsentVerifier]::CheckAvailabilityAsync().GetAwaiter().GetResult()
+            if ($result -eq 'Available') { 'available' } else { 'unavailable' }
+        "#])
+        .output();
+
+    match output {
+        Ok(out) => {
+            let result = String::from_utf8_lossy(&out.stdout).trim().to_lowercase();
+            BiometricResult {
+                success: true,
+                available: result.contains("available"),
+                error: if result.contains("available") { None } else { Some("Windows Hello not configured".to_string()) },
+            }
+        }
+        Err(_) => BiometricResult {
+            success: true,
+            available: false,
+            error: Some("Could not check Windows Hello availability".to_string()),
+        },
     }
 }
 
-#[cfg(not(target_os = "macos"))]
+#[cfg(target_os = "windows")]
 #[tauri::command]
-fn authenticate_biometric(_reason: String) -> BiometricResult {
+fn authenticate_biometric(reason: String) -> BiometricResult {
+    use std::process::Command;
+
+    // Use Windows Hello for authentication
+    let script = format!(r#"
+        Add-Type -AssemblyName System.Runtime.WindowsRuntime
+        $null = [Windows.Security.Credentials.UI.UserConsentVerifier,Windows.Security.Credentials.UI,ContentType=WindowsRuntime]
+        $result = [Windows.Security.Credentials.UI.UserConsentVerifier]::RequestVerificationAsync("{}").GetAwaiter().GetResult()
+        if ($result -eq 'Verified') {{ 'success' }} else {{ 'failed' }}
+    "#, reason.replace("\"", "`\""));
+
+    let output = Command::new("powershell")
+        .args(["-Command", &script])
+        .output();
+
+    match output {
+        Ok(out) => {
+            let result = String::from_utf8_lossy(&out.stdout).trim().to_lowercase();
+            let stderr = String::from_utf8_lossy(&out.stderr).trim().to_string();
+
+            if result.contains("success") {
+                BiometricResult {
+                    success: true,
+                    available: true,
+                    error: None,
+                }
+            } else {
+                BiometricResult {
+                    success: false,
+                    available: true,
+                    error: Some(if !stderr.is_empty() { stderr } else { "Authentication failed or cancelled".to_string() }),
+                }
+            }
+        }
+        Err(e) => BiometricResult {
+            success: false,
+            available: true,
+            error: Some(format!("Failed to run Windows Hello: {}", e)),
+        },
+    }
+}
+
+// ============ Linux Implementation (using polkit/pkexec) ============
+#[cfg(target_os = "linux")]
+#[tauri::command]
+fn check_biometric_available() -> BiometricResult {
+    use std::process::Command;
+
+    // Check if pkexec (polkit) is available - standard on most Linux distros
+    let output = Command::new("which")
+        .arg("pkexec")
+        .output();
+
+    let available = output.map(|o| o.status.success()).unwrap_or(false);
+
+    BiometricResult {
+        success: true,
+        available,
+        error: if available { None } else { Some("System authentication not available".to_string()) },
+    }
+}
+
+#[cfg(target_os = "linux")]
+#[tauri::command]
+fn authenticate_biometric(reason: String) -> BiometricResult {
+    use std::process::Command;
+
+    // Use zenity or kdialog for password prompt with system auth
+    // Try zenity first (GTK), then kdialog (KDE)
+    let zenity_result = Command::new("zenity")
+        .args(["--password", "--title", &reason])
+        .output();
+
+    if let Ok(output) = zenity_result {
+        if output.status.success() {
+            // User entered password - verify with sudo -v
+            let password = String::from_utf8_lossy(&output.stdout).trim().to_string();
+            let verify = Command::new("sh")
+                .args(["-c", &format!("echo '{}' | sudo -S -v 2>/dev/null", password)])
+                .output();
+
+            if verify.map(|v| v.status.success()).unwrap_or(false) {
+                return BiometricResult {
+                    success: true,
+                    available: true,
+                    error: None,
+                };
+            }
+        }
+    }
+
+    // Try kdialog as fallback
+    let kdialog_result = Command::new("kdialog")
+        .args(["--password", &reason])
+        .output();
+
+    if let Ok(output) = kdialog_result {
+        if output.status.success() {
+            let password = String::from_utf8_lossy(&output.stdout).trim().to_string();
+            let verify = Command::new("sh")
+                .args(["-c", &format!("echo '{}' | sudo -S -v 2>/dev/null", password)])
+                .output();
+
+            if verify.map(|v| v.status.success()).unwrap_or(false) {
+                return BiometricResult {
+                    success: true,
+                    available: true,
+                    error: None,
+                };
+            }
+        }
+    }
+
     BiometricResult {
         success: false,
-        available: false,
-        error: Some("Biometrics only available on macOS".to_string()),
+        available: true,
+        error: Some("Authentication failed or cancelled".to_string()),
     }
 }
 
