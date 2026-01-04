@@ -108,23 +108,26 @@ jobs:
       - name: Download and sign macOS aarch64
         env:
           TAURI_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          TAURI_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: |
           # Clean the key (remove any whitespace)
           export TAURI_PRIVATE_KEY=$(printf '%s' "$TAURI_PRIVATE_KEY" | tr -d '\n\r\t ')
+          # Clean the password too
+          CLEAN_PASSWORD=$(printf '%s' "$TAURI_KEY_PASSWORD" | tr -d '\n\r\t ')
           curl -sL "https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/Hyperliquid.Trader_aarch64.app.tar.gz" -o /tmp/aarch64.tar.gz
-          tauri signer sign /tmp/aarch64.tar.gz
+          tauri signer sign -p "$CLEAN_PASSWORD" /tmp/aarch64.tar.gz
           AARCH64_SIG=$(cat /tmp/aarch64.tar.gz.sig)
           echo "AARCH64_SIG=$AARCH64_SIG" >> $GITHUB_ENV
 
       - name: Download and sign macOS x64
         env:
           TAURI_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          TAURI_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: |
           export TAURI_PRIVATE_KEY=$(printf '%s' "$TAURI_PRIVATE_KEY" | tr -d '\n\r\t ')
+          CLEAN_PASSWORD=$(printf '%s' "$TAURI_KEY_PASSWORD" | tr -d '\n\r\t ')
           curl -sL "https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/Hyperliquid.Trader_x64.app.tar.gz" -o /tmp/x64.tar.gz
-          tauri signer sign /tmp/x64.tar.gz
+          tauri signer sign -p "$CLEAN_PASSWORD" /tmp/x64.tar.gz
           X64_SIG=$(cat /tmp/x64.tar.gz.sig)
           echo "X64_SIG=$X64_SIG" >> $GITHUB_ENV
 
