@@ -62,29 +62,36 @@ fn authenticate_biometric(reason: String) -> BiometricResult {
         };
     }
 
-    // Use osascript to trigger Touch ID authentication
-    // This uses the system's built-in Touch ID prompt
-    let script = format!(
+    // Use Swift script for Touch ID - AppleScript-ObjC bridge doesn't handle async well
+    let swift_code = format!(
         r#"
-        use framework "LocalAuthentication"
-        set context to current application's LAContext's alloc()'s init()
-        set policy to current application's LAPolicyDeviceOwnerAuthenticationWithBiometrics
-        set canEval to context's canEvaluatePolicy:policy |error|:(missing value)
-        if not canEval then
-            return "unavailable"
-        end if
-        set authResult to context's evaluatePolicy:policy localizedReason:"{}" |error|:(missing value)
-        if authResult then
-            return "success"
-        else
-            return "failed"
-        end if
-        "#,
+import LocalAuthentication
+import Foundation
+
+let context = LAContext()
+var error: NSError?
+
+guard context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error) else {{
+    print("unavailable")
+    exit(0)
+}}
+
+let semaphore = DispatchSemaphore(value: 0)
+var authSuccess = false
+
+context.evaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, localizedReason: "{}") {{ success, _ in
+    authSuccess = success
+    semaphore.signal()
+}}
+
+semaphore.wait()
+print(authSuccess ? "success" : "failed")
+"#,
         reason.replace("\"", "\\\"")
     );
 
-    let output = Command::new("osascript")
-        .args(["-l", "AppleScript", "-e", &script])
+    let output = Command::new("swift")
+        .args(["-e", &swift_code])
         .output();
 
     match output {
