@@ -5,9 +5,8 @@ import { useRive, Layout, Fit, Alignment } from "@rive-app/react-canvas";
 
 function RiveBackground() {
   const { RiveComponent } = useRive({
-    src: "https://public.rive.app/community/runtime-files/18667-35097-crypto-website-concept.riv",
+    src: "/crypto-orb.riv",
     stateMachines: "State Machine 1",
-    artboard: "CoinOrb",
     layout: new Layout({
       fit: Fit.Cover,
       alignment: Alignment.Center,
@@ -16,7 +15,7 @@ function RiveBackground() {
   });
 
   return (
-    <div className="absolute inset-0 z-0 opacity-50">
+    <div className="absolute inset-0 z-0">
       <RiveComponent />
     </div>
   );
@@ -24,24 +23,27 @@ function RiveBackground() {
 
 export default function HeroSection() {
   return (
-    <div className="relative min-h-[70vh] flex items-center justify-center overflow-hidden">
+    <div className="relative min-h-[80vh] flex items-center justify-center overflow-hidden bg-[#0a1628]">
       <RiveBackground />
 
       {/* Content overlay */}
-      <div className="relative z-10 container mx-auto px-4 py-16">
+      <div className="relative z-10 container mx-auto px-4 py-20">
         <div className="max-w-3xl mx-auto text-center">
-          <h1 className="text-5xl md:text-6xl font-bold mb-4 drop-shadow-lg">
+          <h1 className="text-5xl md:text-7xl font-bold mb-6 text-white"
+              style={{ textShadow: "0 4px 30px rgba(0,0,0,0.5)" }}>
             Systems Trader
           </h1>
-          <p className="text-gray-300 text-xl mb-12 drop-shadow-md">
+          <p className="text-gray-300 text-xl md:text-2xl mb-12"
+             style={{ textShadow: "0 2px 20px rgba(0,0,0,0.5)" }}>
             Collaborative platform for validating trading pattern detection algorithms
           </p>
 
-          <div className="flex justify-center gap-4">
+          <div className="flex flex-col sm:flex-row justify-center gap-4">
             <Link
               href="/sessions/new"
-              className="px-6 py-3 bg-blue-600 text-white rounded-lg font-medium text-lg
-                       hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-lg"
+              className="px-8 py-4 bg-blue-600 text-white rounded-full font-medium text-lg
+                       hover:bg-blue-500 transition-all flex items-center justify-center gap-2
+                       shadow-[0_0_30px_rgba(59,130,246,0.5)] hover:shadow-[0_0_40px_rgba(59,130,246,0.7)]"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -50,8 +52,8 @@ export default function HeroSection() {
             </Link>
             <Link
               href="/sessions"
-              className="px-6 py-3 bg-gray-800/80 backdrop-blur text-white rounded-lg font-medium text-lg
-                       hover:bg-gray-700 transition-colors shadow-lg"
+              className="px-8 py-4 bg-gray-800/60 backdrop-blur-sm border border-gray-600 text-white
+                       rounded-full font-medium text-lg hover:bg-gray-700/60 transition-all"
             >
               View Sessions
             </Link>
