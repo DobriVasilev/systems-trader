@@ -1,13 +1,22 @@
 # Dependencies
 node_modules/
+__pycache__/
+*.pyc
+.pnp.*
+.yarn/*
 
 # Build outputs
 dist/
-src-tauri/target/
+build/
+.next/
+out/
+target/
+*.egg-info/
 
-# OS files
-.DS_Store
-Thumbs.db
+# Environment files
+.env
+.env.*
+!.env.example
 
 # IDE
 .vscode/
@@ -15,27 +24,32 @@ Thumbs.db
 *.swp
 *.swo
 
-# Environment files
-.env
-.env.local
-.env.*.local
+# OS files
+.DS_Store
+Thumbs.db
 
 # Logs
 *.log
 npm-debug.log*
+yarn-debug.log*
 
-# Tauri dev artifacts
-src-tauri/WixTools/
-src-tauri/icons/*.icns.iconset/
+# Test artifacts
+coverage/
+test-results/
+playwright-report/
+.playwright/
 
-# Python cache
-python/__pycache__/
-python/*.pyc
+# Tauri
+desktop/src-tauri/target/
+desktop/src-tauri/WixTools/
+
+# Vercel
+.vercel
+
+# TypeScript
+*.tsbuildinfo
 
 # Temporary files
 *.temp
 *.tmp
 .tmp*
-
-# Archive files (keep extension source separate)
-tradingview-bridge.zip

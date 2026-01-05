@@ -1,0 +1,9 @@
+name = "trading"
+main = "worker.js"
+compatibility_date = "2024-01-01"
+account_id = "a9238c3aa2160c6d5f09c5b259ae471b"
+
+[env.production]
+routes = [
+  { pattern = "trading.dobrilab.workers.dev", custom_domain = true }
+]

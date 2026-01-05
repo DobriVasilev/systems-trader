@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Position Size Calculator</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0b0e11;
+            color: #eaecef;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .calculator {
+            background: #1e2329;
+            border-radius: 16px;
+            padding: 32px;
+            width: 100%;
+            max-width: 400px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+        }
+        h1 {
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 24px;
+            text-align: center;
+            color: #f0b90b;
+        }
+        .input-group {
+            margin-bottom: 16px;
+        }
+        label {
+            display: block;
+            font-size: 13px;
+            color: #848e9c;
+            margin-bottom: 6px;
+        }
+        input {
+            width: 100%;
+            padding: 12px 16px;
+            background: #2b3139;
+            border: 1px solid #363c45;
+            border-radius: 8px;
+            color: #eaecef;
+            font-size: 16px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        input:focus {
+            border-color: #f0b90b;
+        }
+        input::placeholder {
+            color: #5e6673;
+        }
+        .direction-toggle {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+        .direction-btn {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            background: #2b3139;
+            color: #848e9c;
+        }
+        .direction-btn.active.long {
+            background: #02c076;
+            color: #fff;
+        }
+        .direction-btn.active.short {
+            background: #f6465d;
+            color: #fff;
+        }
+        .direction-btn:hover:not(.active) {
+            background: #363c45;
+        }
+        .result-box {
+            background: #2b3139;
+            border-radius: 12px;
+            padding: 20px;
+            margin-top: 24px;
+            text-align: center;
+        }
+        .result-label {
+            font-size: 13px;
+            color: #848e9c;
+            margin-bottom: 8px;
+        }
+        .result-value {
+            font-size: 32px;
+            font-weight: 700;
+            color: #f0b90b;
+            font-family: 'SF Mono', Monaco, monospace;
+        }
+        .result-unit {
+            font-size: 16px;
+            color: #848e9c;
+            margin-left: 4px;
+        }
+        .copy-btn {
+            margin-top: 16px;
+            padding: 10px 24px;
+            background: #f0b90b;
+            color: #0b0e11;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .copy-btn:hover {
+            background: #d4a50a;
+        }
+        .copy-btn.copied {
+            background: #02c076;
+        }
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid #363c45;
+            font-size: 13px;
+        }
+        .info-label {
+            color: #848e9c;
+        }
+        .info-value {
+            color: #eaecef;
+        }
+        .error {
+            color: #f6465d;
+            font-size: 13px;
+            margin-top: 8px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="calculator">
+        <h1>Position Size Calculator</h1>
+        
+        <div class="input-group">
+            <label>Risk Amount (USDT)</label>
+            <input type="number" id="risk" value="1" step="0.1" placeholder="1.00">
+        </div>
+        
+        <div class="input-group">
+            <label>Entry Price (USDT)</label>
+            <input type="number" id="entry" placeholder="90000" step="0.1">
+        </div>
+        
+        <div class="input-group">
+            <label>Stop Loss Price (USDT)</label>
+            <input type="number" id="stoploss" placeholder="90500" step="0.1">
+        </div>
+
+        <div class="direction-toggle">
+            <button class="direction-btn long" onclick="setDirection('long')">Long</button>
+            <button class="direction-btn short active" onclick="setDirection('short')">Short</button>
+        </div>
+        
+        <div class="result-box">
+            <div class="result-label">Quantity to Enter</div>
+            <div class="result-value" id="quantity">—<span class="result-unit">USDT</span></div>
+            <button class="copy-btn" id="copyBtn" onclick="copyQuantity()">Copy Quantity</button>
+            
+            <div class="info-row">
+                <span class="info-label">Distance</span>
+                <span class="info-value" id="distance">—</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Distance %</span>
+                <span class="info-value" id="distancePercent">—</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Margin (25x)</span>
+                <span class="info-value" id="margin">—</span>
+            </div>
+        </div>
+        <div class="error" id="error"></div>
+    </div>
+
+    <script>
+        let direction = 'short';
+        
+        function setDirection(dir) {
+            direction = dir;
+            document.querySelectorAll('.direction-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            document.querySelector(`.direction-btn.${dir}`).classList.add('active');
+            calculate();
+        }
+        
+        function calculate() {
+            const risk = parseFloat(document.getElementById('risk').value);
+            const entry = parseFloat(document.getElementById('entry').value);
+            const sl = parseFloat(document.getElementById('stoploss').value);
+            const errorEl = document.getElementById('error');
+            
+            errorEl.textContent = '';
+            
+            if (!risk || !entry || !sl) {
+                document.getElementById('quantity').innerHTML = '—<span class="result-unit">USDT</span>';
+                document.getElementById('distance').textContent = '—';
+                document.getElementById('distancePercent').textContent = '—';
+                document.getElementById('margin').textContent = '—';
+                return;
+            }
+            
+            // Validate direction vs SL placement
+            if (direction === 'long' && sl >= entry) {
+                errorEl.textContent = 'For LONG: Stop loss should be below entry';
+                return;
+            }
+            if (direction === 'short' && sl <= entry) {
+                errorEl.textContent = 'For SHORT: Stop loss should be above entry';
+                return;
+            }
+            
+            const distance = Math.abs(sl - entry);
+            const distancePercent = (distance / entry) * 100;
+            
+            // Formula: Qty = (Risk × Entry) / Distance
+            const quantity = (risk * entry) / distance;
+            const margin = quantity / 25;
+            
+            // Round down to avoid going over risk
+            const roundedQty = Math.floor(quantity);
+            
+            document.getElementById('quantity').innerHTML = `${roundedQty.toLocaleString()}<span class="result-unit">USDT</span>`;
+            document.getElementById('distance').textContent = `$${distance.toFixed(2)}`;
+            document.getElementById('distancePercent').textContent = `${distancePercent.toFixed(3)}%`;
+            document.getElementById('margin').textContent = `$${margin.toFixed(2)}`;
+        }
+        
+        function copyQuantity() {
+            const qty = document.getElementById('quantity').textContent.replace(/[^0-9]/g, '');
+            if (qty && qty !== '—') {
+                navigator.clipboard.writeText(qty);
+                const btn = document.getElementById('copyBtn');
+                btn.textContent = 'Copied!';
+                btn.classList.add('copied');
+                setTimeout(() => {
+                    btn.textContent = 'Copy Quantity';
+                    btn.classList.remove('copied');
+                }, 1500);
+            }
+        }
+        
+        // Auto-calculate on input
+        document.querySelectorAll('input').forEach(input => {
+            input.addEventListener('input', calculate);
+        });
+        
+        // Initial calculation
+        calculate();
+    </script>
+</body>
+</html>
