@@ -185,14 +185,41 @@ export function CandlestickChart({
       // Get time and price from coordinates
       const timeScale = chartRef.current.timeScale();
       const time = timeScale.coordinateToTime(x);
-      const price = candleSeriesRef.current.coordinateToPrice(y);
+      const clickedPrice = candleSeriesRef.current.coordinateToPrice(y);
 
-      if (time !== null && price !== null) {
-        // Find if we clicked on a marker
+      if (time !== null && clickedPrice !== null) {
+        // Find the candle at this time first
+        const candleIndex = candles.findIndex((c) => c.time === time);
+        const candle = candleIndex !== -1 ? candles[candleIndex] : null;
+
+        // Find if we clicked on a marker - check BOTH X and Y position
         const clickedMarker = markers.find((m) => {
           const markerX = timeScale.timeToCoordinate(m.time as Time);
           if (markerX === null) return false;
-          return Math.abs(markerX - x) < 20;
+
+          // X must be close (within 15px)
+          if (Math.abs(markerX - x) > 15) return false;
+
+          // Also check Y position - marker must be near the click
+          // Get the marker's candle to check vertical position
+          const markerCandle = candles.find(c => c.time === m.time);
+          if (!markerCandle) return false;
+
+          // Calculate marker's Y coordinate based on position
+          let markerPrice: number;
+          if (m.position === "aboveBar") {
+            markerPrice = markerCandle.high;
+          } else if (m.position === "belowBar") {
+            markerPrice = markerCandle.low;
+          } else {
+            markerPrice = (markerCandle.high + markerCandle.low) / 2;
+          }
+
+          const markerY = candleSeriesRef.current?.priceToCoordinate(markerPrice);
+          if (markerY === null || markerY === undefined) return false;
+
+          // Y must also be close (within 25px for marker area)
+          return Math.abs(markerY - y) < 25;
         });
 
         if (clickedMarker && onMarkerClick) {
@@ -200,16 +227,47 @@ export function CandlestickChart({
           return;
         }
 
-        // Find if we clicked on a candle
-        const clickedCandleIndex = candles.findIndex((c) => c.time === time);
-        if (clickedCandleIndex !== -1 && onCandleClick) {
-          onCandleClick(candles[clickedCandleIndex], clickedCandleIndex);
+        // For candle clicks, snap to nearest price level (high, low, open, close)
+        if (candle && onCandleClick) {
+          const clickedPriceNum = clickedPrice as number;
+          // Find which price level is closest to clicked price
+          const priceLevels = [
+            { price: candle.high, name: "high" },
+            { price: candle.low, name: "low" },
+            { price: candle.open, name: "open" },
+            { price: candle.close, name: "close" },
+          ];
+
+          const closestLevel = priceLevels.reduce((closest, level) => {
+            return Math.abs(level.price - clickedPriceNum) < Math.abs(closest.price - clickedPriceNum)
+              ? level
+              : closest;
+          });
+
+          // Create modified candle with snapped price info
+          const snappedCandle = {
+            ...candle,
+            _snappedPrice: closestLevel.price,
+            _snappedLevel: closestLevel.name,
+          };
+
+          onCandleClick(snappedCandle as ChartCandle, candleIndex);
           return;
         }
 
-        // General chart click
+        // General chart click with snapped price if on a candle
         if (onChartClick) {
-          onChartClick(time as number, price);
+          let finalPrice = clickedPrice as number;
+
+          if (candle) {
+            // Snap to nearest level
+            const priceLevels = [candle.high, candle.low, candle.open, candle.close];
+            finalPrice = priceLevels.reduce((closest, level) =>
+              Math.abs(level - (clickedPrice as number)) < Math.abs(closest - (clickedPrice as number)) ? level : closest
+            );
+          }
+
+          onChartClick(time as number, finalPrice);
         }
       }
     },

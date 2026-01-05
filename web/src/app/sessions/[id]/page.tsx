@@ -172,7 +172,9 @@ export default function SessionDetailPage({
     // Only open add modal if Add Mode is enabled
     if (!isAddMode) return;
 
-    setAddData({ time: candle.time, price: candle.close, candleIndex: index });
+    // Use snapped price if available (from click detection), otherwise fall back to close
+    const snappedPrice = (candle as { _snappedPrice?: number })._snappedPrice ?? candle.close;
+    setAddData({ time: candle.time, price: snappedPrice, candleIndex: index });
     setCorrectionMode("add");
     setSelectedDetection(null);
     setCorrectionModalOpen(true);
@@ -343,7 +345,7 @@ export default function SessionDetailPage({
   }
 
   return (
-    <main className="min-h-screen bg-gray-950 text-gray-100">
+    <main className="h-screen overflow-hidden bg-gray-950 text-gray-100 flex flex-col">
       {/* Header */}
       <header className="border-b border-gray-800 bg-gray-900/50 backdrop-blur-sm sticky top-0 z-40">
         <div className="container mx-auto px-4 py-3 flex items-center justify-between">
@@ -468,9 +470,9 @@ export default function SessionDetailPage({
       )}
 
       {/* Main Content */}
-      <div className="flex">
+      <div className="flex flex-1 overflow-hidden">
         {/* Chart Area */}
-        <div className="flex-1 p-4">
+        <div className="flex-1 p-4 overflow-auto">
           {isLoading ? (
             <div className="flex items-center justify-center h-[600px] bg-gray-900 rounded-lg">
               <div className="flex items-center gap-3">
@@ -542,12 +544,47 @@ export default function SessionDetailPage({
         </div>
 
         {/* Sidebar */}
-        <div className="w-80 border-l border-gray-800 bg-gray-900/30">
-          <div className="p-4 border-b border-gray-800">
+        <div className="w-80 border-l border-gray-800 bg-gray-900/30 flex flex-col overflow-hidden">
+          <div className="p-4 border-b border-gray-800 flex-shrink-0">
             <h2 className="font-semibold text-lg">Activity</h2>
           </div>
 
-          <div className="overflow-y-auto" style={{ maxHeight: "calc(100vh - 200px)" }}>
+          <div className="flex-1 overflow-y-auto">
+            {/* Comments - Now at top */}
+            <div className="p-4 border-b border-gray-800">
+              <h3 className="text-sm font-medium text-gray-400 mb-3">
+                Comments {session?.comments?.length ? `(${session.comments.length})` : ""}
+              </h3>
+
+              {/* Comment Input */}
+              <div className="mb-4">
+                <CommentInput
+                  onSubmit={(content) => handleAddComment(content)}
+                  placeholder="Add a comment about this session..."
+                />
+              </div>
+
+              {/* Comments List */}
+              {session?.comments && session.comments.length > 0 ? (
+                <div className="space-y-4">
+                  {session.comments.map((comment) => (
+                    <CommentThread
+                      key={comment.id}
+                      comment={comment}
+                      onReply={handleReplyComment}
+                      onResolve={handleResolveComment}
+                      onDelete={handleDeleteComment}
+                      currentUserId={authSession?.user?.id}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-gray-500 text-center py-2">
+                  No comments yet
+                </p>
+              )}
+            </div>
+
             {/* Detections Summary */}
             {session?.detections && session.detections.length > 0 && (
               <div className="p-4 border-b border-gray-800">
@@ -689,41 +726,6 @@ export default function SessionDetailPage({
               </div>
             )}
 
-            {/* Comments */}
-            <div className="p-4 border-b border-gray-800">
-              <h3 className="text-sm font-medium text-gray-400 mb-3">
-                Comments {session?.comments?.length ? `(${session.comments.length})` : ""}
-              </h3>
-
-              {/* Comment Input */}
-              <div className="mb-4">
-                <CommentInput
-                  onSubmit={(content) => handleAddComment(content)}
-                  placeholder="Add a comment about this session..."
-                />
-              </div>
-
-              {/* Comments List */}
-              {session?.comments && session.comments.length > 0 ? (
-                <div className="space-y-4">
-                  {session.comments.map((comment) => (
-                    <CommentThread
-                      key={comment.id}
-                      comment={comment}
-                      onReply={handleReplyComment}
-                      onResolve={handleResolveComment}
-                      onDelete={handleDeleteComment}
-                      currentUserId={authSession?.user?.id}
-                    />
-                  ))}
-                </div>
-              ) : (
-                <p className="text-sm text-gray-500 text-center py-2">
-                  No comments yet
-                </p>
-              )}
-            </div>
-
             {/* Empty State */}
             {(!session?.detections?.length && !session?.corrections?.length && !session?.comments?.length) && (
               <div className="p-4 text-center text-gray-500 text-sm">
@@ -737,7 +739,7 @@ export default function SessionDetailPage({
 
       {/* Footer Info */}
       {session && (
-        <div className="border-t border-gray-800 bg-gray-900/30">
+        <div className="border-t border-gray-800 bg-gray-900/30 flex-shrink-0">
           <div className="container mx-auto px-4 py-2 flex items-center justify-between text-xs text-gray-500">
             <div className="flex items-center gap-4">
               <span>ID: {session.id}</span>
