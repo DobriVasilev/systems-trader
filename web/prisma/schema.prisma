@@ -106,7 +106,7 @@ model PatternSession {
   shares         SessionShare[]
 
   // Status
-  status         String   @default("draft") // draft, active, completed, archived
+  status         String   @default("active") // active, completed, archived
 
   // Metadata
   description    String?  @db.Text

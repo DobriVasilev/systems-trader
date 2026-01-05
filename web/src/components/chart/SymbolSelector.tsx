@@ -71,10 +71,6 @@ export function SymbolSelector({
   // Close dropdown when clicking outside
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      // Don't close if clicking the toggle button
-      if (buttonRef.current?.contains(event.target as Node)) {
-        return;
-      }
       if (
         dropdownRef.current &&
         !dropdownRef.current.contains(event.target as Node)

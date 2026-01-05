@@ -65,9 +65,6 @@ export function TimeframeSelector({
   // Close dropdown when clicking outside
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      if (buttonRef.current?.contains(event.target as Node)) {
-        return;
-      }
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setIsOpen(false);
       }
@@ -147,19 +144,6 @@ export function TimeframeSelector({
               <div className="text-xs text-gray-500 uppercase font-medium">Timeframes</div>
             </div>
 
-            {/* Custom interval option */}
-            <button
-              onClick={() => {
-                // For now, just show a message - full custom intervals would need more work
-                alert("Custom intervals coming soon! Use starred timeframes for quick access.");
-              }}
-              className="w-full px-3 py-2 text-left text-sm text-gray-400 hover:bg-gray-800 hover:text-white transition-colors flex items-center gap-2 border-b border-gray-800"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
-              Add custom interval...
-            </button>
 
             {/* Grouped timeframes */}
             <div className="max-h-72 overflow-y-auto">

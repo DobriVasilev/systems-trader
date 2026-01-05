@@ -151,7 +151,7 @@ export default function SessionDetailPage({
         position,
         color,
         shape,
-        text: d.structure || d.detectionType.replace("swing_", "").replace("_", " ").toUpperCase(),
+        text: d.detectionType.replace("swing_", "").replace("_", " ").toUpperCase(),
         size: 1,
       };
     });
@@ -413,18 +413,6 @@ export default function SessionDetailPage({
                     </>
                   )}
                 </button>
-                <span
-                  className={`px-2 py-1 text-xs rounded-full ${
-                    {
-                      draft: "bg-gray-600",
-                      active: "bg-green-600",
-                      completed: "bg-blue-600",
-                      archived: "bg-gray-500",
-                    }[session.status]
-                  } text-white`}
-                >
-                  {session.status}
-                </span>
               </>
             )}
           </div>
@@ -633,11 +621,6 @@ export default function SessionDetailPage({
                           >
                             {d.detectionType.replace("_", " ")}
                           </span>
-                          {d.structure && (
-                            <span className="text-xs px-1.5 py-0.5 bg-gray-800 rounded">
-                              {d.structure}
-                            </span>
-                          )}
                           {d.status === "confirmed" && (
                             <span className="text-xs px-1.5 py-0.5 bg-blue-900 text-blue-300 rounded">
                               confirmed

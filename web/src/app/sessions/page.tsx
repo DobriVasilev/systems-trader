@@ -35,13 +35,6 @@ function SessionCard({
     setIsDeleting(false);
   };
 
-  const statusColors = {
-    draft: "bg-gray-600",
-    active: "bg-green-600",
-    completed: "bg-blue-600",
-    archived: "bg-gray-500",
-  };
-
   return (
     <Link
       href={`/sessions/${session.id}`}
@@ -59,11 +52,6 @@ function SessionCard({
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <span
-            className={`px-2 py-0.5 text-xs rounded-full ${statusColors[session.status]} text-white`}
-          >
-            {session.status}
-          </span>
           <button
             onClick={handleDelete}
             disabled={isDeleting}
