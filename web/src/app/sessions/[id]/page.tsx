@@ -72,6 +72,10 @@ export default function SessionDetailPage({
   const [selectedDetection, setSelectedDetection] = useState<PatternDetection | null>(null);
   const [addData, setAddData] = useState<{ time: number; price: number; candleIndex: number } | null>(null);
 
+  // Move mode state - for moving detections to new locations
+  const [movingDetection, setMovingDetection] = useState<PatternDetection | null>(null);
+  const [moveTargetData, setMoveTargetData] = useState<{ time: number; price: number; candleIndex: number } | null>(null);
+
   // Chart tool state - like TradingView drawing tools
   const [activeTool, setActiveTool] = useState<ChartTool>("select");
 
@@ -86,15 +90,19 @@ export default function SessionDetailPage({
         case "v":
         case "V":
           setActiveTool("select");
+          setMovingDetection(null); // Cancel move mode
           break;
         case "1":
           setActiveTool("swing_high");
+          setMovingDetection(null);
           break;
         case "2":
           setActiveTool("swing_low");
+          setMovingDetection(null);
           break;
         case "Escape":
           setActiveTool("select");
+          setMovingDetection(null); // Cancel move mode
           break;
       }
     };
@@ -209,18 +217,27 @@ export default function SessionDetailPage({
   };
 
   const handleChartClick = (time: number, price: number) => {
-    // Only trigger if a drawing tool is selected (not "select" mode)
-    if (activeTool === "select") return;
-
     // Find the candle index for this time
     const candleIndex = candles.findIndex((c) => c.time === time);
-    if (candleIndex !== -1) {
-      setAddData({ time, price, candleIndex });
-      setAutoDetectionType(activeTool); // Pass the tool type to the modal
-      setCorrectionMode("add");
-      setSelectedDetection(null);
+    if (candleIndex === -1) return;
+
+    // Handle move mode - clicking sets the new position
+    if (movingDetection) {
+      setMoveTargetData({ time, price, candleIndex });
+      setSelectedDetection(movingDetection);
+      setCorrectionMode("move");
       setCorrectionModalOpen(true);
+      return;
     }
+
+    // Only trigger add if a drawing tool is selected (not "select" mode)
+    if (activeTool === "select") return;
+
+    setAddData({ time, price, candleIndex });
+    setAutoDetectionType(activeTool); // Pass the tool type to the modal
+    setCorrectionMode("add");
+    setSelectedDetection(null);
+    setCorrectionModalOpen(true);
   };
 
   const handleCorrectionSubmit = async (correctionData: CorrectionData) => {
@@ -246,9 +263,17 @@ export default function SessionDetailPage({
   };
 
   const openCorrectionModal = (mode: "delete" | "move" | "add" | "confirm", detection?: PatternDetection) => {
+    // Move mode: don't open modal yet - wait for user to click new position
+    if (mode === "move" && detection) {
+      setMovingDetection(detection);
+      setMoveTargetData(null);
+      return;
+    }
+
     setCorrectionMode(mode);
     setSelectedDetection(detection || null);
     setAddData(null);
+    setMoveTargetData(null);
     setCorrectionModalOpen(true);
   };
 
@@ -661,20 +686,43 @@ export default function SessionDetailPage({
       )}
 
       {/* Correction Modal */}
+      {/* Move Mode Indicator */}
+      {movingDetection && (
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 px-4 py-3 bg-yellow-900/90 border border-yellow-700 rounded-lg shadow-xl">
+          <div className="flex items-center gap-3">
+            <span className="w-2 h-2 rounded-full bg-yellow-400 animate-pulse" />
+            <span className="text-yellow-200 text-sm font-medium">
+              Click where you want to move "{movingDetection.detectionType.replace("_", " ")}"
+            </span>
+            <button
+              onClick={() => setMovingDetection(null)}
+              className="ml-2 text-yellow-400 hover:text-yellow-200 transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
+
       <CorrectionModal
         isOpen={correctionModalOpen}
         onClose={() => {
           setCorrectionModalOpen(false);
+          setMovingDetection(null); // Clear move mode on close
           // Don't reset tool on cancel - keep it selected
         }}
         onSubmit={async (data) => {
           await handleCorrectionSubmit(data);
+          setMovingDetection(null); // Clear move mode after submit
           // Reset to select only after successful submission
           setActiveTool("select");
         }}
         detection={selectedDetection}
         mode={correctionMode}
         addData={addData || undefined}
+        moveTargetData={moveTargetData || undefined}
         autoDetectionType={autoDetectionType}
       />
     </main>

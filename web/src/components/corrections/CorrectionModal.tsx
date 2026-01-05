@@ -15,6 +15,12 @@ interface CorrectionModalProps {
     price: number;
     candleIndex: number;
   };
+  // For move mode - new position
+  moveTargetData?: {
+    time: number;
+    price: number;
+    candleIndex: number;
+  };
   // Auto-set detection type from toolbar tool
   autoDetectionType?: string | null;
 }
@@ -53,6 +59,7 @@ export function CorrectionModal({
   detection,
   mode,
   addData,
+  moveTargetData,
   autoDetectionType,
 }: CorrectionModalProps) {
   const [reason, setReason] = useState("");
@@ -105,9 +112,11 @@ export function CorrectionModal({
         correctionData.correctedStructure = structure || undefined;
       }
 
-      if (mode === "move" && detection) {
-        // For move, we'd need new position data
-        // This would be handled by drag-and-drop in a full implementation
+      if (mode === "move" && detection && moveTargetData) {
+        // For move, use the new position data
+        correctionData.correctedIndex = moveTargetData.candleIndex;
+        correctionData.correctedTime = moveTargetData.time * 1000; // Convert to ms
+        correctionData.correctedPrice = moveTargetData.price;
         correctionData.correctedType = detectionType;
         correctionData.correctedStructure = structure || undefined;
       }
@@ -219,6 +228,19 @@ export function CorrectionModal({
                 </div>
                 <div className="text-sm text-gray-500">
                   Time: {new Date(addData.time * 1000).toLocaleString()}
+                </div>
+              </div>
+            )}
+
+            {/* Move target info */}
+            {mode === "move" && moveTargetData && (
+              <div className="bg-yellow-900/30 border border-yellow-800 rounded-lg p-3">
+                <div className="text-sm text-yellow-400 mb-1">Move to</div>
+                <div className="text-sm text-gray-300">
+                  Price: ${moveTargetData.price.toFixed(2)}
+                </div>
+                <div className="text-sm text-gray-500">
+                  Time: {new Date(moveTargetData.time * 1000).toLocaleString()}
                 </div>
               </div>
             )}
