@@ -1,15 +1,23 @@
-import { auth } from "@/lib/auth";
 import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
 
-// Security headers are now in next.config.ts for smaller bundle size
+// Lightweight middleware - checks session cookie without importing heavy NextAuth bundle
+// Security headers are in next.config.ts
 
-export default auth((req) => {
-  const isLoggedIn = !!req.auth;
-  const isAuthPage = req.nextUrl.pathname.startsWith("/auth");
-  const isApiRoute = req.nextUrl.pathname.startsWith("/api");
-  const isPublicRoute = req.nextUrl.pathname === "/" ||
-    req.nextUrl.pathname === "/privacy" ||
-    req.nextUrl.pathname === "/terms";
+export function middleware(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+
+  // Check for session token (NextAuth uses these cookie names)
+  const sessionToken = request.cookies.get("authjs.session-token") ||
+    request.cookies.get("__Secure-authjs.session-token");
+  const isLoggedIn = !!sessionToken;
+
+  const isAuthPage = pathname.startsWith("/auth");
+  const isApiRoute = pathname.startsWith("/api");
+  const isPublicRoute = pathname === "/" ||
+    pathname === "/privacy" ||
+    pathname === "/terms" ||
+    pathname === "/logo-picker";
 
   // Allow API routes (they handle their own auth)
   if (isApiRoute) {
@@ -18,7 +26,7 @@ export default auth((req) => {
 
   // Redirect authenticated users away from auth pages
   if (isAuthPage && isLoggedIn) {
-    return NextResponse.redirect(new URL("/sessions", req.url));
+    return NextResponse.redirect(new URL("/sessions", request.url));
   }
 
   // Allow public routes
@@ -28,13 +36,13 @@ export default auth((req) => {
 
   // Protect all other routes
   if (!isLoggedIn) {
-    const loginUrl = new URL("/auth/login", req.url);
-    loginUrl.searchParams.set("callbackUrl", req.nextUrl.pathname);
+    const loginUrl = new URL("/auth/login", request.url);
+    loginUrl.searchParams.set("callbackUrl", pathname);
     return NextResponse.redirect(loginUrl);
   }
 
   return NextResponse.next();
-});
+}
 
 export const config = {
   matcher: [
