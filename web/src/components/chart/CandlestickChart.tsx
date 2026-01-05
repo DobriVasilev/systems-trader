@@ -172,6 +172,8 @@ export function CandlestickChart({
   }, [markers]);
 
   // Handle click events
+  // By default: free price selection (exact cursor position)
+  // With Cmd/Ctrl held: snap to nearest candle level (high, low, open, close)
   const handleClick = useCallback(
     (event: React.MouseEvent<HTMLDivElement>) => {
       if (!chartRef.current || !candleSeriesRef.current) return;
@@ -181,6 +183,7 @@ export function CandlestickChart({
 
       const x = event.clientX - rect.left;
       const y = event.clientY - rect.top;
+      const shouldSnap = event.metaKey || event.ctrlKey; // Cmd on Mac, Ctrl on Windows
 
       // Get time and price from coordinates
       const timeScale = chartRef.current.timeScale();
@@ -227,40 +230,48 @@ export function CandlestickChart({
           return;
         }
 
-        // For candle clicks, snap to nearest price level (high, low, open, close)
+        // For candle clicks
         if (candle && onCandleClick) {
           const clickedPriceNum = clickedPrice as number;
-          // Find which price level is closest to clicked price
-          const priceLevels = [
-            { price: candle.high, name: "high" },
-            { price: candle.low, name: "low" },
-            { price: candle.open, name: "open" },
-            { price: candle.close, name: "close" },
-          ];
+          let finalPrice = clickedPriceNum;
+          let snappedLevel = "free";
 
-          const closestLevel = priceLevels.reduce((closest, level) => {
-            return Math.abs(level.price - clickedPriceNum) < Math.abs(closest.price - clickedPriceNum)
-              ? level
-              : closest;
-          });
+          // Only snap to price levels if Cmd/Ctrl is held
+          if (shouldSnap) {
+            const priceLevels = [
+              { price: candle.high, name: "high" },
+              { price: candle.low, name: "low" },
+              { price: candle.open, name: "open" },
+              { price: candle.close, name: "close" },
+            ];
 
-          // Create modified candle with snapped price info
+            const closestLevel = priceLevels.reduce((closest, level) => {
+              return Math.abs(level.price - clickedPriceNum) < Math.abs(closest.price - clickedPriceNum)
+                ? level
+                : closest;
+            });
+
+            finalPrice = closestLevel.price;
+            snappedLevel = closestLevel.name;
+          }
+
+          // Create modified candle with price info
           const snappedCandle = {
             ...candle,
-            _snappedPrice: closestLevel.price,
-            _snappedLevel: closestLevel.name,
+            _snappedPrice: finalPrice,
+            _snappedLevel: snappedLevel,
           };
 
           onCandleClick(snappedCandle as ChartCandle, candleIndex);
           return;
         }
 
-        // General chart click with snapped price if on a candle
+        // General chart click
         if (onChartClick) {
           let finalPrice = clickedPrice as number;
 
-          if (candle) {
-            // Snap to nearest level
+          // Only snap if Cmd/Ctrl is held and we're on a candle
+          if (shouldSnap && candle) {
             const priceLevels = [candle.high, candle.low, candle.open, candle.close];
             finalPrice = priceLevels.reduce((closest, level) =>
               Math.abs(level - (clickedPrice as number)) < Math.abs(closest - (clickedPrice as number)) ? level : closest

@@ -4,6 +4,7 @@ import { signIn } from "next-auth/react";
 import { useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { Logo } from "@/components/ui/Logo";
 
 function LoginForm() {
   const [email, setEmail] = useState("");
@@ -178,19 +179,7 @@ export default function LoginPage() {
         {/* Content */}
         <div className="relative z-10 flex flex-col justify-between p-10 w-full">
           {/* Logo */}
-          <div className="flex items-center gap-2">
-            <svg className="w-7 h-9" viewBox="0 0 28 35" fill="none">
-              <path d="M14 0L28 8.75V26.25L14 35L0 26.25V8.75L14 0Z" fill="url(#logo-gradient)" />
-              <path d="M14 7L21 11.375V20.125L14 24.5L7 20.125V11.375L14 7Z" fill="#0a0a0f" fillOpacity="0.5" />
-              <defs>
-                <linearGradient id="logo-gradient" x1="0" y1="0" x2="28" y2="35" gradientUnits="userSpaceOnUse">
-                  <stop stopColor="#3B82F6" />
-                  <stop offset="1" stopColor="#60A5FA" />
-                </linearGradient>
-              </defs>
-            </svg>
-            <span className="text-xl font-semibold text-white">Systems Trader</span>
-          </div>
+          <Logo size="lg" />
 
           {/* Hero Text */}
           <div className="max-w-md">
@@ -217,20 +206,8 @@ export default function LoginPage() {
       <div className="flex-1 flex items-center justify-center p-8">
         <div className="w-full max-w-md">
           {/* Mobile Logo */}
-          <div className="lg:hidden text-center mb-8">
-            <div className="flex items-center justify-center gap-2 mb-2">
-              <svg className="w-7 h-9" viewBox="0 0 28 35" fill="none">
-                <path d="M14 0L28 8.75V26.25L14 35L0 26.25V8.75L14 0Z" fill="url(#logo-gradient-mobile)" />
-                <path d="M14 7L21 11.375V20.125L14 24.5L7 20.125V11.375L14 7Z" fill="#0a0a0f" fillOpacity="0.5" />
-                <defs>
-                  <linearGradient id="logo-gradient-mobile" x1="0" y1="0" x2="28" y2="35" gradientUnits="userSpaceOnUse">
-                    <stop stopColor="#3B82F6" />
-                    <stop offset="1" stopColor="#60A5FA" />
-                  </linearGradient>
-                </defs>
-              </svg>
-              <span className="text-xl font-semibold text-white">Systems Trader</span>
-            </div>
+          <div className="lg:hidden flex justify-center mb-8">
+            <Logo size="lg" />
           </div>
 
           <div className="text-center mb-8">

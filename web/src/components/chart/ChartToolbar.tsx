@@ -191,20 +191,25 @@ export function ChartToolbar({ activeTool, onToolChange, disabled }: ChartToolba
       {/* Active tool indicator */}
       {activeTool !== "select" && (
         <div
-          className="mt-2 px-3 py-2 rounded-lg text-xs font-medium flex items-center gap-2 shadow-lg"
+          className="mt-2 px-3 py-2 rounded-lg text-xs font-medium shadow-lg"
           style={{ backgroundColor: activeToolConfig?.color + "20", color: activeToolConfig?.color }}
         >
-          <span className="w-2 h-2 rounded-full animate-pulse" style={{ backgroundColor: activeToolConfig?.color }} />
-          {activeToolConfig?.label}
-          <button
-            onClick={() => onToolChange("select")}
-            className="ml-auto opacity-60 hover:opacity-100 transition-opacity"
-            title="Cancel (ESC)"
-          >
-            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full animate-pulse" style={{ backgroundColor: activeToolConfig?.color }} />
+            {activeToolConfig?.label}
+            <button
+              onClick={() => onToolChange("select")}
+              className="ml-auto opacity-60 hover:opacity-100 transition-opacity"
+              title="Cancel (ESC)"
+            >
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+          <div className="text-[10px] opacity-70 mt-1">
+            Hold {typeof navigator !== "undefined" && navigator.platform?.includes("Mac") ? "⌘" : "Ctrl"} to snap to candle levels
+          </div>
         </div>
       )}
     </div>
