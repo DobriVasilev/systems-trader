@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useMemo, useState, useCallback, useRef } from "react";
+import { use, useMemo, useState, useCallback, useRef, useEffect } from "react";
 import Link from "next/link";
 import { useSession as useAuthSession } from "next-auth/react";
 import { useSession, PatternDetection } from "@/hooks/useSession";
@@ -69,6 +69,28 @@ export default function SessionDetailPage({
   const [correctionMode, setCorrectionMode] = useState<"delete" | "move" | "add" | "confirm">("delete");
   const [selectedDetection, setSelectedDetection] = useState<PatternDetection | null>(null);
   const [addData, setAddData] = useState<{ time: number; price: number; candleIndex: number } | null>(null);
+
+  // Add mode toggle - must be enabled to click-to-add detections
+  const [isAddMode, setIsAddMode] = useState(false);
+
+  // Keyboard shortcut for Add Mode (press 'A' to toggle)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't trigger if typing in an input
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+
+      if (e.key === "a" || e.key === "A") {
+        setIsAddMode((prev) => !prev);
+      }
+      // Escape to turn off add mode
+      if (e.key === "Escape" && isAddMode) {
+        setIsAddMode(false);
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [isAddMode]);
 
   // Fetch fresh candles if session doesn't have them stored
   const { candles: fetchedCandles, isLoading: candlesLoading } = useCandles({
@@ -147,7 +169,9 @@ export default function SessionDetailPage({
   };
 
   const handleCandleClick = (candle: ChartCandle, index: number) => {
-    // Open add modal at this candle position
+    // Only open add modal if Add Mode is enabled
+    if (!isAddMode) return;
+
     setAddData({ time: candle.time, price: candle.close, candleIndex: index });
     setCorrectionMode("add");
     setSelectedDetection(null);
@@ -167,6 +191,9 @@ export default function SessionDetailPage({
   };
 
   const handleChartClick = (time: number, price: number) => {
+    // Only open add modal if Add Mode is enabled
+    if (!isAddMode) return;
+
     // Find the candle index for this time
     const candleIndex = candles.findIndex((c) => c.time === time);
     if (candleIndex !== -1) {
@@ -472,8 +499,24 @@ export default function SessionDetailPage({
               <div className="w-3 h-3 rounded-full bg-purple-500" />
               <span>MSB</span>
             </div>
-            <div className="ml-auto text-gray-500">
-              Click on markers to add corrections or comments
+            <div className="ml-auto flex items-center gap-4">
+              <span className="text-gray-500 text-sm">Click markers to edit</span>
+              <button
+                onClick={() => setIsAddMode(!isAddMode)}
+                className={`
+                  flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-all
+                  ${isAddMode
+                    ? "bg-green-600 text-white shadow-lg shadow-green-600/30"
+                    : "bg-gray-800 text-gray-400 hover:text-white hover:bg-gray-700"
+                  }
+                `}
+                title="Toggle Add Mode (A)"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+                {isAddMode ? "Adding Mode ON" : "Add Detection"}
+              </button>
             </div>
           </div>
         </div>

@@ -30,9 +30,15 @@ export function SymbolSelector({
   const [search, setSearch] = useState("");
   const dropdownRef = useRef<HTMLDivElement>(null);
 
+  const buttonRef = useRef<HTMLButtonElement>(null);
+
   // Close dropdown when clicking outside
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
+      // Don't close if clicking the toggle button (let the button's onClick handle it)
+      if (buttonRef.current?.contains(event.target as Node)) {
+        return;
+      }
       if (
         dropdownRef.current &&
         !dropdownRef.current.contains(event.target as Node)
@@ -51,6 +57,7 @@ export function SymbolSelector({
   return (
     <div className="relative" ref={dropdownRef}>
       <button
+        ref={buttonRef}
         onClick={() => !disabled && setIsOpen(!isOpen)}
         disabled={disabled}
         className={`
