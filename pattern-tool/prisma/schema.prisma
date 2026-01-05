@@ -1,0 +1,319 @@
+// Pattern Tool Database Schema
+// PostgreSQL on Neon
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// AUTH MODELS (NextAuth.js)
+// ============================================================================
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  password      String?   @db.Text // For credentials provider
+
+  // Relations
+  accounts      Account[]
+  sessions      Session[]
+
+  // Pattern Tool relations
+  createdSessions  PatternSession[]   @relation("SessionCreator")
+  sharedSessions   SessionShare[]
+  corrections      PatternCorrection[]
+  comments         PatternComment[]
+  events           PatternEvent[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ============================================================================
+// PATTERN SESSION
+// ============================================================================
+
+model PatternSession {
+  id             String   @id // ULID
+
+  // Display name
+  name           String   // User-friendly session name
+
+  // What we're reviewing
+  symbol         String   // "BTC", "ETH"
+  timeframe      String   // "1m", "5m", "15m", "1h", "4h", "1d"
+  startTime      DateTime? // Optional: will be computed from candle data
+  endTime        DateTime? // Optional: will be computed from candle data
+  patternType    String   // "swings", "bos", "msb", "range", "false_breakout"
+  patternVersion String   @default("1.0.0") // Algorithm version that generated detections
+
+  // Candle data snapshot (stored to ensure consistency)
+  candleData     Json?    // Array of OHLCV candles
+
+  // Ownership
+  createdById    String
+  createdBy      User     @relation("SessionCreator", fields: [createdById], references: [id])
+
+  // Collaboration
+  isPublic       Boolean  @default(false)
+  shares         SessionShare[]
+
+  // Status
+  status         String   @default("draft") // draft, active, completed, archived
+
+  // Metadata
+  description    String?  @db.Text
+
+  // Timestamps
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // Relations
+  detections     PatternDetection[]
+  corrections    PatternCorrection[]
+  comments       PatternComment[]
+  events         PatternEvent[]
+
+  @@index([createdById, status])
+  @@index([patternType, status])
+  @@index([createdAt])
+}
+
+model SessionShare {
+  id         String   @id @default(cuid())
+  sessionId  String
+  userId     String
+
+  // Permissions: view, comment, edit, admin
+  permission String   @default("view")
+
+  session    PatternSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  user       User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt  DateTime @default(now())
+
+  @@unique([sessionId, userId])
+}
+
+// ============================================================================
+// PATTERN DETECTION
+// ============================================================================
+
+model PatternDetection {
+  id            String   @id // ULID
+  sessionId     String
+
+  // Position on chart
+  candleIndex   Int
+  candleTime    DateTime
+  price         Float
+
+  // What was detected
+  detectionType String   // "swing_high", "swing_low", "bos_bullish", "bos_bearish", etc.
+  structure     String?  // "HH", "HL", "LH", "LL" for swings
+
+  // Algorithm metadata
+  confidence    Float?   // If algorithm provides confidence score
+  metadata      Json?    // Algorithm-specific data
+
+  // Visual position (for canvas rendering)
+  canvasX       Float?
+  canvasY       Float?
+
+  // Status
+  status        String   @default("pending") // pending, confirmed, rejected, moved
+
+  // Timestamps
+  createdAt     DateTime @default(now())
+
+  // Relations
+  session       PatternSession      @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  corrections   PatternCorrection[]
+  comments      PatternComment[]
+
+  @@index([sessionId, detectionType])
+  @@index([sessionId, status])
+  @@index([candleTime])
+}
+
+// ============================================================================
+// PATTERN CORRECTION
+// ============================================================================
+
+model PatternCorrection {
+  id            String   @id // ULID
+  sessionId     String
+  detectionId   String?  // Null if adding new detection
+  userId        String
+
+  // What kind of correction
+  correctionType String  // "move", "delete", "add", "confirm"
+
+  // Original state (for moves)
+  originalIndex  Int?
+  originalTime   DateTime?
+  originalPrice  Float?
+  originalType   String?
+
+  // Corrected state (for moves/adds)
+  correctedIndex Int?
+  correctedTime  DateTime?
+  correctedPrice Float?
+  correctedType  String?  // If changing detection type
+  correctedStructure String? // If changing structure (HH/HL/LH/LL)
+
+  // Why
+  reason        String   @db.Text
+
+  // Attachments
+  attachments   Json?    // [{id, url, type, name, size}]
+
+  // Status
+  status        String   @default("pending") // pending, applied, disputed
+  resolvedAt    DateTime?
+  resolvedById  String?
+
+  // Timestamps
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  session       PatternSession     @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  detection     PatternDetection?  @relation(fields: [detectionId], references: [id], onDelete: SetNull)
+  user          User               @relation(fields: [userId], references: [id])
+  comments      PatternComment[]   @relation("CorrectionComments")
+
+  @@index([sessionId, status])
+  @@index([userId])
+  @@index([detectionId])
+  @@index([createdAt])
+}
+
+// ============================================================================
+// PATTERN COMMENT
+// ============================================================================
+
+model PatternComment {
+  id            String   @id // ULID
+  sessionId     String
+  userId        String
+
+  // What it's attached to (one of these)
+  detectionId   String?
+  correctionId  String?
+  parentId      String?  // For threaded replies
+
+  // Content
+  content       String   @db.Text
+  attachments   Json?    // [{id, url, type, name, size}]
+
+  // Position on canvas (for positional comments)
+  canvasX       Float?
+  canvasY       Float?
+  candleTime    DateTime?
+
+  // Status
+  resolved      Boolean  @default(false)
+  resolvedAt    DateTime?
+  resolvedById  String?
+
+  // Edit tracking
+  editedAt      DateTime?
+  editCount     Int      @default(0)
+  originalContent String? @db.Text // Store original if edited
+
+  // Timestamps
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  session       PatternSession     @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  user          User               @relation(fields: [userId], references: [id])
+  detection     PatternDetection?  @relation(fields: [detectionId], references: [id], onDelete: SetNull)
+  correction    PatternCorrection? @relation("CorrectionComments", fields: [correctionId], references: [id], onDelete: SetNull)
+  parent        PatternComment?    @relation("CommentReplies", fields: [parentId], references: [id], onDelete: SetNull)
+  replies       PatternComment[]   @relation("CommentReplies")
+
+  @@index([sessionId])
+  @@index([detectionId])
+  @@index([correctionId])
+  @@index([parentId])
+  @@index([userId])
+  @@index([createdAt])
+}
+
+// ============================================================================
+// PATTERN EVENT (Audit Trail)
+// ============================================================================
+
+model PatternEvent {
+  id            String   @id // ULID
+  sessionId     String
+  userId        String
+
+  // Event details
+  eventType     String   // "session_created", "detection_added", "correction_made", etc.
+  entityType    String?  // "session", "detection", "correction", "comment"
+  entityId      String?  // ULID of the entity
+
+  // Full event payload
+  payload       Json     // {action, before, after, metadata}
+
+  // Optional: snapshot for replay
+  canvasSnapshot Json?
+
+  // Timestamp
+  createdAt     DateTime @default(now())
+
+  // Relations
+  session       PatternSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  user          User           @relation(fields: [userId], references: [id])
+
+  @@index([sessionId, createdAt])
+  @@index([entityId])
+  @@index([eventType])
+  @@index([userId, createdAt])
+}
