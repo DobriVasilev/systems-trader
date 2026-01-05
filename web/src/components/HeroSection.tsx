@@ -1,30 +1,107 @@
 "use client";
 
 import Link from "next/link";
-import { useRive, Layout, Fit, Alignment } from "@rive-app/react-canvas";
+import { useEffect, useRef, useState } from "react";
 
-function RiveBackground() {
-  const { RiveComponent } = useRive({
-    src: "/crypto-orb.riv",
-    stateMachines: "State Machine 1",
-    layout: new Layout({
-      fit: Fit.Cover,
-      alignment: Alignment.Center,
-    }),
-    autoplay: true,
-  });
+// Lightweight interactive background with cursor-following spotlight and floating particles
+function InteractiveBackground() {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [mousePos, setMousePos] = useState({ x: 0.5, y: 0.5 });
+  const [isPressed, setIsPressed] = useState(false);
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!containerRef.current) return;
+      const rect = containerRef.current.getBoundingClientRect();
+      setMousePos({
+        x: (e.clientX - rect.left) / rect.width,
+        y: (e.clientY - rect.top) / rect.height,
+      });
+    };
+
+    const handleMouseDown = () => setIsPressed(true);
+    const handleMouseUp = () => setIsPressed(false);
+
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mousedown", handleMouseDown);
+    window.addEventListener("mouseup", handleMouseUp);
+
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mousedown", handleMouseDown);
+      window.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, []);
 
   return (
-    <div className="absolute inset-0 z-0">
-      <RiveComponent />
+    <div ref={containerRef} className="absolute inset-0 z-0 overflow-hidden bg-[#0a1628]">
+      {/* Cursor-following spotlight */}
+      <div
+        className={`absolute w-[800px] h-[800px] rounded-full pointer-events-none transition-transform duration-100 ${
+          isPressed ? "scale-110" : "scale-100"
+        }`}
+        style={{
+          left: `${mousePos.x * 100}%`,
+          top: `${mousePos.y * 100}%`,
+          transform: `translate(-50%, -50%) ${isPressed ? "scale(1.1)" : "scale(1)"}`,
+          background: `radial-gradient(circle, rgba(59,130,246,0.15) 0%, rgba(59,130,246,0.05) 40%, transparent 70%)`,
+        }}
+      />
+
+      {/* Central glowing orb */}
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
+        <div className={`w-[400px] h-[400px] rounded-full transition-transform duration-200 ${isPressed ? "scale-95" : "scale-100"}`}>
+          <div className="absolute inset-0 rounded-full bg-blue-500/10 blur-[80px] animate-pulse" />
+          <div className="absolute inset-[20%] rounded-full bg-blue-600/15 blur-[50px] animate-[pulse_3s_ease-in-out_infinite]" />
+          <div className="absolute inset-[35%] rounded-full bg-blue-400/20 blur-[30px] animate-[pulse_2s_ease-in-out_infinite_0.5s]" />
+        </div>
+      </div>
+
+      {/* Floating particles */}
+      {[...Array(12)].map((_, i) => (
+        <div
+          key={i}
+          className={`absolute rounded-full bg-blue-400/30 blur-[1px] transition-transform duration-200 ${
+            isPressed ? "scale-150" : "scale-100"
+          }`}
+          style={{
+            width: `${4 + (i % 3) * 2}px`,
+            height: `${4 + (i % 3) * 2}px`,
+            left: `${10 + (i * 7) % 80}%`,
+            top: `${15 + (i * 11) % 70}%`,
+            animation: `float ${5 + (i % 4)}s ease-in-out infinite ${i * 0.3}s`,
+          }}
+        />
+      ))}
+
+      {/* Grid overlay */}
+      <div
+        className="absolute inset-0 opacity-[0.02]"
+        style={{
+          backgroundImage: `
+            linear-gradient(rgba(59,130,246,0.5) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(59,130,246,0.5) 1px, transparent 1px)
+          `,
+          backgroundSize: "80px 80px",
+        }}
+      />
+
+      <style jsx>{`
+        @keyframes float {
+          0%, 100% { transform: translateY(0px) translateX(0px); }
+          25% { transform: translateY(-20px) translateX(10px); }
+          50% { transform: translateY(-10px) translateX(-10px); }
+          75% { transform: translateY(-25px) translateX(5px); }
+        }
+      `}</style>
     </div>
   );
 }
 
 export default function HeroSection() {
   return (
-    <div className="relative min-h-[80vh] flex items-center justify-center overflow-hidden bg-[#0a1628]">
-      <RiveBackground />
+    <div className="relative min-h-[80vh] flex items-center justify-center overflow-hidden">
+      <InteractiveBackground />
 
       {/* Content overlay */}
       <div className="relative z-10 container mx-auto px-4 py-20">
