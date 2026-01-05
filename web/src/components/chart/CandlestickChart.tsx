@@ -66,7 +66,7 @@ export function CandlestickChart({
         horzLines: { color: "#1a1a2e" },
       },
       crosshair: {
-        mode: 1, // Normal
+        mode: 0, // Normal (free cursor movement)
         vertLine: {
           color: "#4a4a6a",
           width: 1,

@@ -80,27 +80,19 @@ export default function SessionDetailPage({
       // Don't trigger if typing in an input
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
 
-      const key = e.key.toUpperCase();
+      const key = e.key;
       switch (key) {
+        case "v":
         case "V":
           setActiveTool("select");
           break;
-        case "H":
+        case "1":
           setActiveTool("swing_high");
           break;
-        case "L":
+        case "2":
           setActiveTool("swing_low");
           break;
-        case "B":
-          setActiveTool("bos_bullish");
-          break;
-        case "N":
-          setActiveTool("bos_bearish");
-          break;
-        case "M":
-          setActiveTool("msb_bullish");
-          break;
-        case "ESCAPE":
+        case "Escape":
           setActiveTool("select");
           break;
       }
@@ -136,11 +128,11 @@ export default function SessionDetailPage({
       let shape: "circle" | "square" | "arrowUp" | "arrowDown" = "circle";
 
       if (d.detectionType.includes("high") || d.detectionType.includes("bullish")) {
-        color = d.detectionType.includes("bos") ? "#ff9800" : d.detectionType.includes("msb") ? "#9c27b0" : "#ef5350";
+        color = d.detectionType.includes("bos") ? "#ff9800" : d.detectionType.includes("msb") ? "#9c27b0" : "#26a69a"; // Green for highs
         position = "aboveBar";
         shape = d.detectionType.includes("bos") || d.detectionType.includes("msb") ? "arrowUp" : "circle";
       } else if (d.detectionType.includes("low") || d.detectionType.includes("bearish")) {
-        color = d.detectionType.includes("bos") ? "#ff9800" : d.detectionType.includes("msb") ? "#9c27b0" : "#26a69a";
+        color = d.detectionType.includes("bos") ? "#ff9800" : d.detectionType.includes("msb") ? "#9c27b0" : "#ef5350"; // Red for lows
         position = "belowBar";
         shape = d.detectionType.includes("bos") || d.detectionType.includes("msb") ? "arrowDown" : "circle";
       }
@@ -524,23 +516,15 @@ export default function SessionDetailPage({
           {/* Legend */}
           <div className="mt-4 flex items-center gap-6 text-sm text-gray-400">
             <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-red-500" />
-              <span>Swing High</span>
-            </div>
-            <div className="flex items-center gap-2">
               <div className="w-3 h-3 rounded-full bg-green-500" />
-              <span>Swing Low</span>
+              <span>Swing High (1)</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-orange-500" />
-              <span>BOS</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-purple-500" />
-              <span>MSB</span>
+              <div className="w-3 h-3 rounded-full bg-red-500" />
+              <span>Swing Low (2)</span>
             </div>
             <div className="ml-auto text-gray-500 text-sm">
-              Click markers to edit • Use toolbar or keyboard shortcuts to add
+              Click markers to edit • Press 1 or 2 to add
             </div>
           </div>
         </div>
@@ -608,8 +592,8 @@ export default function SessionDetailPage({
                                 : d.status === "confirmed"
                                 ? "bg-blue-500"
                                 : d.detectionType.includes("high")
-                                ? "bg-red-500"
-                                : "bg-green-500"
+                                ? "bg-green-500"
+                                : "bg-red-500"
                             }`}
                           />
                           <span
