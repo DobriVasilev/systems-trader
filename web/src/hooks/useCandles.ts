@@ -8,6 +8,8 @@ interface UseCandlesOptions {
   symbol: string;
   timeframe: Timeframe;
   days?: number;
+  startTime?: number; // Unix timestamp in ms
+  endTime?: number;   // Unix timestamp in ms
 }
 
 interface UseCandlesResult {
@@ -21,6 +23,8 @@ export function useCandles({
   symbol,
   timeframe,
   days = 30,
+  startTime,
+  endTime,
 }: UseCandlesOptions): UseCandlesResult {
   const [candles, setCandles] = useState<ChartCandle[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -34,8 +38,15 @@ export function useCandles({
       const params = new URLSearchParams({
         symbol,
         interval: timeframe,
-        days: days.toString(),
       });
+
+      // If startTime and endTime are provided, use them; otherwise fall back to days
+      if (startTime && endTime) {
+        params.set("startTime", startTime.toString());
+        params.set("endTime", endTime.toString());
+      } else {
+        params.set("days", days.toString());
+      }
 
       const response = await fetch(`/api/candles?${params}`);
       const data = await response.json();
@@ -51,7 +62,7 @@ export function useCandles({
     } finally {
       setIsLoading(false);
     }
-  }, [symbol, timeframe, days]);
+  }, [symbol, timeframe, days, startTime, endTime]);
 
   useEffect(() => {
     fetchCandles();

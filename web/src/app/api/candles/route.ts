@@ -16,10 +16,13 @@ export async function GET(request: NextRequest) {
   const symbol = searchParams.get("symbol") || "BTC";
   const interval = searchParams.get("interval") || "4h";
   const days = parseInt(searchParams.get("days") || "30");
+  const startTimeParam = searchParams.get("startTime");
+  const endTimeParam = searchParams.get("endTime");
 
   try {
-    const endTime = Date.now();
-    const startTime = endTime - days * 24 * 60 * 60 * 1000;
+    // Use provided startTime/endTime if available, otherwise calculate from days
+    const endTime = endTimeParam ? parseInt(endTimeParam) : Date.now();
+    const startTime = startTimeParam ? parseInt(startTimeParam) : endTime - days * 24 * 60 * 60 * 1000;
 
     const response = await fetch(HYPERLIQUID_API, {
       method: "POST",

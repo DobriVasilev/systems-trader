@@ -1,6 +1,26 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Allow external images for coin icons
+  images: {
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "assets.coincap.io",
+        pathname: "/assets/icons/**",
+      },
+      {
+        protocol: "https",
+        hostname: "assets.coingecko.com",
+        pathname: "/coins/images/**",
+      },
+      {
+        protocol: "https",
+        hostname: "www.cryptocompare.com",
+        pathname: "/media/**",
+      },
+    ],
+  },
   // Security headers - applied to all routes
   async headers() {
     return [

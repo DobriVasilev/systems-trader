@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import Image from "next/image";
 
 interface SymbolSelectorProps {
   value: string;
@@ -10,8 +11,11 @@ interface SymbolSelectorProps {
 
 interface CoinData {
   symbol: string;
+  name: string;
   price: number | null;
-  maxLeverage: number;
+  maxLeverage: number | null;
+  type: "perp" | "spot" | "pre-launch";
+  icon?: string;
 }
 
 // Fallback list if API fails
@@ -19,6 +23,64 @@ const FALLBACK_SYMBOLS = [
   "BTC", "ETH", "SOL", "DOGE", "XRP", "HYPE", "AVAX", "LINK", "ARB", "OP",
   "MATIC", "APT", "SUI", "SEI", "TIA", "INJ", "NEAR", "ATOM", "FTM", "AAVE",
 ];
+
+// Coin icon component with fallback
+function CoinIcon({ symbol, icon, size = 24 }: { symbol: string; icon?: string; size?: number }) {
+  const [imgError, setImgError] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  // Generate gradient colors from symbol
+  const getGradientColors = (sym: string) => {
+    const hash = sym.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0);
+    const hue1 = hash % 360;
+    const hue2 = (hash * 2) % 360;
+    return { hue1, hue2 };
+  };
+
+  const { hue1, hue2 } = getGradientColors(symbol);
+
+  if (!icon || imgError) {
+    return (
+      <div
+        className="rounded-full flex items-center justify-center font-bold text-white"
+        style={{
+          width: size,
+          height: size,
+          background: `linear-gradient(135deg, hsl(${hue1}, 70%, 50%), hsl(${hue2}, 70%, 40%))`,
+          fontSize: size * 0.4,
+        }}
+      >
+        {symbol.slice(0, 2)}
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative" style={{ width: size, height: size }}>
+      {loading && (
+        <div
+          className="absolute inset-0 rounded-full animate-pulse"
+          style={{
+            background: `linear-gradient(135deg, hsl(${hue1}, 70%, 50%), hsl(${hue2}, 70%, 40%))`,
+          }}
+        />
+      )}
+      <Image
+        src={icon}
+        alt={symbol}
+        width={size}
+        height={size}
+        className={`rounded-full ${loading ? "opacity-0" : "opacity-100"} transition-opacity`}
+        onLoad={() => setLoading(false)}
+        onError={() => {
+          setImgError(true);
+          setLoading(false);
+        }}
+        unoptimized // External URLs need this
+      />
+    </div>
+  );
+}
 
 export function SymbolSelector({
   value,
@@ -30,8 +92,10 @@ export function SymbolSelector({
   const [coins, setCoins] = useState<CoinData[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [favorites, setFavorites] = useState<string[]>([]);
+  const [activeTab, setActiveTab] = useState<"all" | "perp" | "spot">("all");
   const dropdownRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   // Load favorites from localStorage
   useEffect(() => {
@@ -56,17 +120,36 @@ export function SymbolSelector({
           setCoins(data.data);
         } else {
           // Use fallback
-          setCoins(FALLBACK_SYMBOLS.map(s => ({ symbol: s, price: null, maxLeverage: 50 })));
+          setCoins(FALLBACK_SYMBOLS.map(s => ({
+            symbol: s,
+            name: s,
+            price: null,
+            maxLeverage: 50,
+            type: "perp" as const,
+          })));
         }
       } catch {
         // Use fallback
-        setCoins(FALLBACK_SYMBOLS.map(s => ({ symbol: s, price: null, maxLeverage: 50 })));
+        setCoins(FALLBACK_SYMBOLS.map(s => ({
+          symbol: s,
+          name: s,
+          price: null,
+          maxLeverage: 50,
+          type: "perp" as const,
+        })));
       } finally {
         setIsLoading(false);
       }
     }
     fetchCoins();
   }, []);
+
+  // Focus search input when opening
+  useEffect(() => {
+    if (isOpen && searchInputRef.current) {
+      setTimeout(() => searchInputRef.current?.focus(), 0);
+    }
+  }, [isOpen]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -101,7 +184,17 @@ export function SymbolSelector({
 
   // Filter and sort coins
   const filteredCoins = coins
-    .filter(c => c.symbol.toLowerCase().includes(search.toLowerCase()))
+    .filter(c => {
+      // Search filter
+      const matchesSearch = c.symbol.toLowerCase().includes(search.toLowerCase()) ||
+        c.name.toLowerCase().includes(search.toLowerCase());
+      if (!matchesSearch) return false;
+
+      // Tab filter
+      if (activeTab === "perp") return c.type === "perp";
+      if (activeTab === "spot") return c.type === "spot";
+      return true;
+    })
     .sort((a, b) => {
       const aFav = favorites.includes(a.symbol);
       const bFav = favorites.includes(b.symbol);
@@ -111,6 +204,8 @@ export function SymbolSelector({
     });
 
   const currentCoin = coins.find(c => c.symbol === value);
+  const perpCount = coins.filter(c => c.type === "perp").length;
+  const spotCount = coins.filter(c => c.type === "spot").length;
 
   return (
     <div className="relative" ref={dropdownRef}>
@@ -119,11 +214,12 @@ export function SymbolSelector({
         onClick={() => !disabled && setIsOpen(!isOpen)}
         disabled={disabled}
         className={`
-          flex items-center gap-2 px-4 py-2 bg-gray-900 rounded-lg
-          text-white font-medium hover:bg-gray-800 transition-colors min-w-[140px]
+          flex items-center gap-2 px-3 py-2 bg-gray-900 rounded-lg
+          text-white font-medium hover:bg-gray-800 transition-colors min-w-[160px]
           ${disabled ? "opacity-50 cursor-not-allowed" : ""}
         `}
       >
+        <CoinIcon symbol={value} icon={currentCoin?.icon} size={20} />
         <span className="font-mono">{value}</span>
         {currentCoin?.price && (
           <span className="text-gray-400 text-sm">{formatPrice(currentCoin.price)}</span>
@@ -144,47 +240,85 @@ export function SymbolSelector({
       </button>
 
       {isOpen && (
-        <div className="absolute top-full left-0 mt-1 w-72 bg-gray-900 rounded-lg shadow-xl border border-gray-800 z-50">
+        <div className="absolute top-full left-0 mt-1 w-80 bg-gray-900 rounded-lg shadow-xl border border-gray-800 z-50">
+          {/* Search */}
           <div className="p-2">
             <input
+              ref={searchInputRef}
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search coins..."
               className="w-full px-3 py-2 bg-gray-800 rounded-md text-white text-sm
                        focus:outline-none focus:ring-2 focus:ring-blue-500"
-              autoFocus
             />
+          </div>
+
+          {/* Tabs */}
+          <div className="flex px-2 gap-1 border-b border-gray-800 pb-2">
+            <button
+              onClick={() => setActiveTab("all")}
+              className={`px-3 py-1 text-xs rounded-md transition-colors ${
+                activeTab === "all"
+                  ? "bg-blue-600 text-white"
+                  : "text-gray-400 hover:text-white hover:bg-gray-800"
+              }`}
+            >
+              All ({coins.length})
+            </button>
+            <button
+              onClick={() => setActiveTab("perp")}
+              className={`px-3 py-1 text-xs rounded-md transition-colors ${
+                activeTab === "perp"
+                  ? "bg-blue-600 text-white"
+                  : "text-gray-400 hover:text-white hover:bg-gray-800"
+              }`}
+            >
+              Perps ({perpCount})
+            </button>
+            <button
+              onClick={() => setActiveTab("spot")}
+              className={`px-3 py-1 text-xs rounded-md transition-colors ${
+                activeTab === "spot"
+                  ? "bg-blue-600 text-white"
+                  : "text-gray-400 hover:text-white hover:bg-gray-800"
+              }`}
+            >
+              Spot ({spotCount})
+            </button>
           </div>
 
           {/* Favorites section */}
           {favorites.length > 0 && !search && (
-            <div className="px-2 pb-2">
-              <div className="text-xs text-gray-500 uppercase px-2 mb-1">Favorites</div>
+            <div className="px-2 py-2 border-b border-gray-800">
+              <div className="text-xs text-gray-500 uppercase px-1 mb-1.5">Favorites</div>
               <div className="flex flex-wrap gap-1">
-                {favorites.map(symbol => (
-                  <button
-                    key={`fav-${symbol}`}
-                    onClick={() => {
-                      onChange(symbol);
-                      setIsOpen(false);
-                      setSearch("");
-                    }}
-                    className={`
-                      px-2 py-1 text-xs rounded transition-colors flex items-center gap-1
-                      ${value === symbol ? "bg-blue-600 text-white" : "bg-gray-800 text-gray-300 hover:bg-gray-700"}
-                    `}
-                  >
-                    {symbol}
-                  </button>
-                ))}
+                {favorites.map(symbol => {
+                  const coin = coins.find(c => c.symbol === symbol);
+                  return (
+                    <button
+                      key={`fav-${symbol}`}
+                      onClick={() => {
+                        onChange(symbol);
+                        setIsOpen(false);
+                        setSearch("");
+                      }}
+                      className={`
+                        px-2 py-1 text-xs rounded transition-colors flex items-center gap-1.5
+                        ${value === symbol ? "bg-blue-600 text-white" : "bg-gray-800 text-gray-300 hover:bg-gray-700"}
+                      `}
+                    >
+                      <CoinIcon symbol={symbol} icon={coin?.icon} size={14} />
+                      {symbol}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}
 
-          <div className="border-t border-gray-800" />
-
-          <div className="max-h-64 overflow-y-auto">
+          {/* Coin list */}
+          <div className="max-h-72 overflow-y-auto">
             {isLoading ? (
               <div className="flex items-center justify-center py-4">
                 <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
@@ -201,31 +335,42 @@ export function SymbolSelector({
                     setSearch("");
                   }}
                   className={`
-                    w-full px-4 py-2.5 text-left text-sm hover:bg-gray-800 transition-colors
+                    w-full px-3 py-2.5 text-left text-sm hover:bg-gray-800 transition-colors
                     flex items-center justify-between group
                     ${value === coin.symbol ? "bg-gray-800" : ""}
                   `}
                 >
                   <div className="flex items-center gap-3">
-                    {/* Coin icon placeholder */}
-                    <div className="w-6 h-6 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-[10px] font-bold text-white">
-                      {coin.symbol.slice(0, 2)}
+                    <CoinIcon symbol={coin.symbol} icon={coin.icon} size={28} />
+                    <div className="flex flex-col">
+                      <span className={`font-mono font-medium ${value === coin.symbol ? "text-blue-400" : "text-gray-200"}`}>
+                        {coin.symbol}
+                      </span>
+                      <span className="text-xs text-gray-500">{coin.name}</span>
                     </div>
-                    <span className={`font-mono ${value === coin.symbol ? "text-blue-400" : "text-gray-200"}`}>
-                      {coin.symbol}
-                    </span>
                   </div>
                   <div className="flex items-center gap-3">
-                    <span className="text-gray-400 text-xs">
-                      {formatPrice(coin.price)}
-                    </span>
+                    <div className="flex flex-col items-end">
+                      <span className="text-gray-300 text-xs font-mono">
+                        {formatPrice(coin.price)}
+                      </span>
+                      <span className={`text-[10px] px-1.5 rounded ${
+                        coin.type === "perp"
+                          ? "bg-purple-500/20 text-purple-400"
+                          : coin.type === "spot"
+                            ? "bg-green-500/20 text-green-400"
+                            : "bg-yellow-500/20 text-yellow-400"
+                      }`}>
+                        {coin.type.toUpperCase()}
+                      </span>
+                    </div>
                     <button
                       onClick={(e) => toggleFavorite(coin.symbol, e)}
                       className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-gray-700 rounded"
                     >
                       <svg
                         className={`w-4 h-4 ${favorites.includes(coin.symbol) ? "text-yellow-400 fill-yellow-400" : "text-gray-500"}`}
-                        fill="none"
+                        fill={favorites.includes(coin.symbol) ? "currentColor" : "none"}
                         stroke="currentColor"
                         viewBox="0 0 24 24"
                       >
@@ -244,7 +389,7 @@ export function SymbolSelector({
           </div>
 
           <div className="border-t border-gray-800 px-3 py-2 text-xs text-gray-500">
-            {coins.length} coins available
+            {coins.length} coins available ({perpCount} perps, {spotCount} spot)
           </div>
         </div>
       )}
