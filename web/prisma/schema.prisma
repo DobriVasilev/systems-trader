@@ -37,6 +37,12 @@ model User {
   comments         PatternComment[]
   events           PatternEvent[]
 
+  // Chat relations
+  chatMessages     ChatMessage[]      @relation("ChatMessages")
+  chatPresence     ChatPresence?
+  sentMessages     DirectMessage[]    @relation("SentMessages")
+  receivedMessages DirectMessage[]    @relation("ReceivedMessages")
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -321,4 +327,94 @@ model PatternEvent {
   @@index([entityId])
   @@index([eventType])
   @@index([userId, createdAt])
+}
+
+// ============================================================================
+// CHAT SYSTEM
+// ============================================================================
+
+model ChatMessage {
+  id          String   @id @default(cuid())
+  userId      String
+  content     String   @db.Text
+
+  // Denormalized for performance (avoid joins on every message)
+  userName    String
+  userAvatar  String?
+  isVip       Boolean  @default(false)
+
+  // Optional image attachment
+  imageUrl    String?
+
+  // Reply support
+  replyToId   String?
+  replyTo     ChatMessage?  @relation("MessageReplies", fields: [replyToId], references: [id], onDelete: SetNull)
+  replies     ChatMessage[] @relation("MessageReplies")
+
+  // Reactions stored as JSON: { "👍": ["userId1", "userId2"], "❤️": ["userId3"] }
+  reactions   Json?
+
+  // Soft delete
+  deleted     Boolean  @default(false)
+  deletedAt   DateTime?
+
+  // Relations
+  user        User     @relation("ChatMessages", fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([createdAt])
+  @@index([userId])
+  @@index([replyToId])
+}
+
+model ChatPresence {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+
+  // Denormalized for performance
+  userName    String
+  userAvatar  String?
+  isVip       Boolean  @default(false)
+
+  // Status
+  status      String   @default("online") // online, away, offline
+  lastSeen    DateTime @default(now())
+
+  // Relations
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@index([lastSeen])
+}
+
+model DirectMessage {
+  id          String   @id @default(cuid())
+
+  // Participants
+  senderId    String
+  receiverId  String
+
+  // Content
+  content     String   @db.Text
+  imageUrl    String?
+
+  // Read status
+  read        Boolean  @default(false)
+  readAt      DateTime?
+
+  // Soft delete (per user)
+  deletedBySender   Boolean @default(false)
+  deletedByReceiver Boolean @default(false)
+
+  // Relations
+  sender      User     @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver    User     @relation("ReceivedMessages", fields: [receiverId], references: [id], onDelete: Cascade)
+
+  createdAt   DateTime @default(now())
+
+  @@index([senderId, receiverId, createdAt])
+  @@index([receiverId, read])
+  @@index([createdAt])
 }
