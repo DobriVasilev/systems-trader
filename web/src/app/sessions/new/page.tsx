@@ -119,19 +119,19 @@ export default function NewSessionPage() {
   return (
     <main className="min-h-screen bg-gray-950 text-gray-100">
       {/* Header */}
-      <header className="border-b border-gray-800 bg-gray-900/50 backdrop-blur-sm sticky top-0 z-40">
-        <div className="container mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Link href="/" className="text-xl font-bold">
+      <header className="border-b border-gray-800 bg-gray-900/50 backdrop-blur-sm sticky top-0 z-50">
+        <div className="container mx-auto px-4 py-3 flex items-center justify-between relative">
+          <nav className="flex items-center gap-4">
+            <Link href="/" className="text-xl font-bold hover:text-blue-400 transition-colors cursor-pointer">
               Systems Trader
             </Link>
             <span className="text-gray-500">/</span>
-            <Link href="/sessions" className="text-gray-400 hover:text-white transition-colors">
+            <Link href="/sessions" className="text-gray-400 hover:text-white transition-colors cursor-pointer">
               Sessions
             </Link>
             <span className="text-gray-500">/</span>
             <span className="text-gray-400">New Session</span>
-          </div>
+          </nav>
           <div className="flex items-center gap-3">
             <input
               type="text"
