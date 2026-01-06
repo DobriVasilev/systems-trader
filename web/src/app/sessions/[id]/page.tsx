@@ -86,8 +86,15 @@ export default function SessionDetailPage({
   const [draggingMarkerId, setDraggingMarkerId] = useState<string | null>(null);
   const dragApiCallInProgressRef = useRef(false);
 
-  // Undo history - stores correction IDs that can be undone
-  const [undoHistory, setUndoHistory] = useState<string[]>([]);
+  // Undo history - stores correction info for optimistic undo
+  interface UndoEntry {
+    correctionId: string;
+    correctionType: string;
+    detectionId?: string;
+    originalStatus?: string;
+    movedDetectionId?: string; // For move: the new detection that was created
+  }
+  const [undoHistory, setUndoHistory] = useState<UndoEntry[]>([]);
   const [isUndoing, setIsUndoing] = useState(false);
 
   // Chart tool state - like TradingView drawing tools
@@ -103,33 +110,39 @@ export default function SessionDetailPage({
     marker: ChartMarker;
   } | null>(null);
 
-  // Undo the last correction
+  // Undo the last correction (optimistic update for instant feel)
   const handleUndo = useCallback(async () => {
     if (undoHistory.length === 0 || isUndoing) return;
 
-    const lastCorrectionId = undoHistory[undoHistory.length - 1];
-    console.log('[Session] Undoing correction:', lastCorrectionId);
+    const lastEntry = undoHistory[undoHistory.length - 1];
+    console.log('[Session] Undoing correction:', lastEntry.correctionId, lastEntry.correctionType);
 
+    // Remove from history immediately (optimistic)
+    setUndoHistory(prev => prev.slice(0, -1));
     setIsUndoing(true);
-    try {
-      const response = await fetch(`/api/sessions/${id}/corrections/${lastCorrectionId}`, {
-        method: "DELETE",
-      });
 
-      const data = await response.json();
-      if (data.success) {
-        // Remove from undo history
-        setUndoHistory(prev => prev.slice(0, -1));
-        // Refetch session to get updated detections
-        await refetch();
-      } else {
-        console.error("Undo failed:", data.error);
-      }
-    } catch (error) {
-      console.error("Undo error:", error);
-    } finally {
-      setIsUndoing(false);
-    }
+    // Make API call in background (don't await for UI)
+    fetch(`/api/sessions/${id}/corrections/${lastEntry.correctionId}`, {
+      method: "DELETE",
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (!data.success) {
+          console.error("Undo API failed:", data.error);
+          // Re-add to history on failure
+          setUndoHistory(prev => [...prev, lastEntry]);
+        }
+        // Refetch in background to sync state
+        refetch();
+      })
+      .catch(error => {
+        console.error("Undo error:", error);
+        // Re-add to history on failure
+        setUndoHistory(prev => [...prev, lastEntry]);
+      })
+      .finally(() => {
+        setIsUndoing(false);
+      });
   }, [id, undoHistory, isUndoing, refetch]);
 
   // Keyboard shortcuts for tools
@@ -375,10 +388,16 @@ export default function SessionDetailPage({
         throw new Error(data.error || "Failed to submit correction");
       }
 
-      // Add correction ID to undo history
+      // Add correction to undo history with full info for optimistic undo
       if (data.data?.id) {
-        setUndoHistory(prev => [...prev, data.data.id]);
-        console.log('[Session] Added to undo history:', data.data.id);
+        const undoEntry: UndoEntry = {
+          correctionId: data.data.id,
+          correctionType: correctionData.correctionType,
+          detectionId: correctionData.detectionId,
+          originalStatus: selectedDetection?.status,
+        };
+        setUndoHistory(prev => [...prev, undoEntry]);
+        console.log('[Session] Added to undo history:', undoEntry);
       }
 
       // Refetch session to get updated data
@@ -947,12 +966,46 @@ export default function SessionDetailPage({
       {contextMenu && (() => {
         const detection = session?.detections.find((d) => d.id === contextMenu.marker.id);
         const isConfirmed = detection?.status === "confirmed";
+        const hasReasoning = typeof detection?.metadata?.fullReasoning === "string";
 
         return (
           <ContextMenu
             x={contextMenu.x}
             y={contextMenu.y}
             items={[
+              // View reasoning (if available)
+              ...(hasReasoning
+                ? [
+                    {
+                      label: "View Reasoning",
+                      icon: (
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                      ),
+                      onClick: () => {
+                        if (detection) {
+                          // Open modal in options mode which shows reasoning
+                          setSelectedDetection(detection);
+                          setCorrectionMode("options");
+                          setCorrectionModalOpen(true);
+                        }
+                      },
+                    },
+                  ]
+                : []),
+              // Copy ID
+              {
+                label: `Copy ID (${contextMenu.marker.id.slice(-6)})`,
+                icon: (
+                  <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+                  </svg>
+                ),
+                onClick: () => {
+                  navigator.clipboard.writeText(contextMenu.marker.id);
+                },
+              },
               // Confirm/Unconfirm based on current status
               isConfirmed
                 ? {

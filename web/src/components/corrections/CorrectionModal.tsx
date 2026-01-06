@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { PatternDetection } from "@/hooks/useSession";
 
 interface CorrectionModalProps {
@@ -71,6 +71,9 @@ export function CorrectionModal({
   const [internalMode, setInternalMode] = useState<"delete" | "move" | "add" | "confirm" | "unconfirm">("delete");
   const [showReasoning, setShowReasoning] = useState(false);
 
+  // Form ref for programmatic submission
+  const formRef = useRef<HTMLFormElement>(null);
+
   // Reset form when modal opens
   useEffect(() => {
     if (isOpen) {
@@ -89,6 +92,32 @@ export function CorrectionModal({
       }
     }
   }, [isOpen, detection, autoDetectionType, mode]);
+
+  // Cmd/Ctrl+Enter to submit
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+        e.preventDefault();
+        // Trigger form submit
+        formRef.current?.requestSubmit();
+      }
+      // Escape to close
+      if (e.key === "Escape") {
+        e.preventDefault();
+        onClose();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, onClose]);
+
+  // Copy ID to clipboard
+  const copyId = useCallback((id: string) => {
+    navigator.clipboard.writeText(id);
+  }, []);
 
   if (!isOpen) return null;
 
@@ -219,7 +248,7 @@ export function CorrectionModal({
 
       {/* Modal */}
       <div className={`relative bg-gray-900 rounded-xl shadow-xl border border-gray-800 w-full mx-4 ${showReasoning ? "max-w-2xl" : "max-w-md"}`}>
-        <form onSubmit={handleSubmit}>
+        <form ref={formRef} onSubmit={handleSubmit}>
           {/* Header */}
           <div className="px-6 py-4 border-b border-gray-800">
             <h2 className="text-lg font-semibold text-white">{getModeTitle()}</h2>
@@ -232,7 +261,18 @@ export function CorrectionModal({
             {detection && (
               <div className="bg-gray-800 rounded-lg p-3">
                 <div className="flex items-center justify-between mb-1">
-                  <div className="text-sm text-gray-400">Detection</div>
+                  <div className="flex items-center gap-2">
+                    <div className="text-sm text-gray-400">Detection</div>
+                    {/* Copyable ID */}
+                    <button
+                      type="button"
+                      onClick={() => copyId(detection.id)}
+                      className="text-xs px-1.5 py-0.5 bg-gray-700 text-gray-400 rounded font-mono hover:bg-gray-600 transition-colors"
+                      title="Click to copy ID"
+                    >
+                      #{detection.id.slice(-6)}
+                    </button>
+                  </div>
                   {typeof detection.metadata?.fullReasoning === "string" && (
                     <button
                       type="button"

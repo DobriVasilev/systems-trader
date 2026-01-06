@@ -107,20 +107,30 @@ export function CandlestickChart({
     price: number;
   }>>([]);
 
-  // Save chart position to localStorage
+  // Debounce ref for position saving
+  const saveTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
+
+  // Save chart position to localStorage (debounced)
   const saveChartPosition = useCallback(() => {
     if (!chartRef.current || !sessionId) return;
 
-    const timeScale = chartRef.current.timeScale();
-    const visibleRange = timeScale.getVisibleRange();
-    if (visibleRange) {
-      const key = `chart-position-${sessionId}`;
-      console.log('[Chart] Saving position', { from: visibleRange.from, to: visibleRange.to });
-      localStorage.setItem(key, JSON.stringify({
-        from: visibleRange.from,
-        to: visibleRange.to,
-      }));
+    // Debounce - only save after 300ms of no changes
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
     }
+
+    saveTimeoutRef.current = setTimeout(() => {
+      if (!chartRef.current) return;
+      const timeScale = chartRef.current.timeScale();
+      const visibleRange = timeScale.getVisibleRange();
+      if (visibleRange) {
+        const key = `chart-position-${sessionId}`;
+        localStorage.setItem(key, JSON.stringify({
+          from: visibleRange.from,
+          to: visibleRange.to,
+        }));
+      }
+    }, 300);
   }, [sessionId]);
 
   // Restore chart position from localStorage
@@ -269,16 +279,15 @@ export function CandlestickChart({
 
     // Only fit content on initial load, and try to restore saved position
     if (!initialLoadDoneRef.current) {
-      console.log('[Chart] Initial load - will restore or fit');
       initialLoadDoneRef.current = true;
-      // Try to restore saved position, otherwise fit content
-      const restored = restoreChartPosition();
-      if (!restored) {
-        console.log('[Chart] No saved position, fitting content');
-        chartRef.current?.timeScale().fitContent();
-      }
-    } else {
-      console.log('[Chart] Subsequent data update - NOT fitting content');
+      // Use requestAnimationFrame to ensure chart is rendered before restoring position
+      requestAnimationFrame(() => {
+        // Try to restore saved position, otherwise fit content
+        const restored = restoreChartPosition();
+        if (!restored) {
+          chartRef.current?.timeScale().fitContent();
+        }
+      });
     }
   }, [candles, restoreChartPosition]);
 
