@@ -4,6 +4,14 @@ import { useState, useEffect, useRef, useCallback, useMemo, Suspense } from "rea
 import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import { TELEGRAM_COLORS, getLastSeenText, DEFAULT_REACTIONS } from "@/lib/telegram-theme";
+import { MessageBubble } from "@/components/chat/MessageBubble";
+import { EmojiPicker } from "@/components/chat/EmojiPicker";
+import { VoiceRecorder } from "@/components/chat/VoiceRecorder";
+import { TypingIndicator } from "@/components/chat/TypingIndicator";
+import { UserProfileSidebar } from "@/components/chat/UserProfileSidebar";
+import { AdminPanel } from "@/components/chat/AdminPanel";
+import { FriendRequestsList, SendRequestModal } from "@/components/chat/FriendRequests";
 
 // Types
 interface ChatMessage {
@@ -112,16 +120,22 @@ interface TypingUser {
 
 type ViewMode = "channels" | "dms";
 
-const EMOJI_OPTIONS = ["👍", "❤️", "😂", "😮", "😢", "🔥", "🚀", "💯"];
+const EMOJI_OPTIONS = DEFAULT_REACTIONS.map(r => r.emoji);
 const CHANNEL_ICONS = ["💬", "📢", "🎯", "💡", "🔧", "📈", "🎨", "🌟"];
 
 // Loading fallback for Suspense
 function ChatLoadingFallback() {
   return (
-    <main className="min-h-screen bg-gray-950 text-gray-100 flex items-center justify-center">
+    <main
+      className="min-h-screen flex items-center justify-center"
+      style={{ backgroundColor: TELEGRAM_COLORS.bgColor, color: TELEGRAM_COLORS.text }}
+    >
       <div className="flex items-center gap-3">
-        <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-        <span className="text-gray-400">Loading chat...</span>
+        <div
+          className="w-5 h-5 border-2 border-t-transparent rounded-full animate-spin"
+          style={{ borderColor: TELEGRAM_COLORS.primary, borderTopColor: "transparent" }}
+        />
+        <span style={{ color: TELEGRAM_COLORS.hint }}>Loading chat...</span>
       </div>
     </main>
   );
@@ -175,6 +189,24 @@ function ChatPageContent() {
   const [newChannelIcon, setNewChannelIcon] = useState("💬");
   const [isLoading, setIsLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
+
+  // New integrated component states
+  const [showInputEmoji, setShowInputEmoji] = useState(false);
+  const [isRecordingVoice, setIsRecordingVoice] = useState(false);
+  const [showUserProfile, setShowUserProfile] = useState(false);
+  const [selectedProfileUser, setSelectedProfileUser] = useState<{
+    id: string;
+    name: string;
+    image: string | null;
+    email?: string;
+    bio?: string;
+    lastSeen?: string;
+  } | null>(null);
+  const [showAdminPanel, setShowAdminPanel] = useState(false);
+  const [showFriendRequests, setShowFriendRequests] = useState(false);
+  const [showSendRequestModal, setShowSendRequestModal] = useState(false);
+  const [sendRequestUserId, setSendRequestUserId] = useState<string | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   // Refs
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -365,6 +397,12 @@ function ChatPageContent() {
         fetchNotifications(),
         updatePresence(),
       ]);
+
+      // Check if user is admin
+      if (session?.user?.email === "dobrivassi09@gmail.com") {
+        setIsAdmin(true);
+      }
+
       setIsLoading(false);
 
       // Connect to SSE
@@ -907,12 +945,16 @@ function ChatPageContent() {
 
   if (!session?.user) {
     return (
-      <main className="min-h-screen bg-gray-950 text-gray-100 flex items-center justify-center">
+      <main
+        className="min-h-screen flex items-center justify-center"
+        style={{ backgroundColor: TELEGRAM_COLORS.bgColor, color: TELEGRAM_COLORS.text }}
+      >
         <div className="text-center">
           <h1 className="text-2xl font-bold mb-4">Sign in to access chat</h1>
           <Link
             href="/api/auth/signin"
-            className="px-4 py-2 bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+            className="px-4 py-2 rounded-lg transition-colors"
+            style={{ backgroundColor: TELEGRAM_COLORS.primary, color: TELEGRAM_COLORS.buttonText }}
           >
             Sign In
           </Link>
@@ -922,23 +964,33 @@ function ChatPageContent() {
   }
 
   return (
-    <main className="min-h-screen bg-gray-950 text-gray-100 flex flex-col">
+    <main
+      className="min-h-screen flex flex-col"
+      style={{ backgroundColor: TELEGRAM_COLORS.bgColor, color: TELEGRAM_COLORS.text }}
+    >
       {/* Header */}
-      <header className="border-b border-gray-800 bg-gray-900/50 backdrop-blur-sm sticky top-0 z-50">
+      <header
+        className="backdrop-blur-sm sticky top-0 z-50"
+        style={{
+          backgroundColor: TELEGRAM_COLORS.headerBg,
+          borderBottom: `1px solid ${TELEGRAM_COLORS.border}`,
+        }}
+      >
         <div className="container mx-auto px-4 py-3 flex items-center justify-between">
           <nav className="flex items-center gap-2 text-sm">
             <Link
               href="/dashboard"
-              className="font-semibold text-white hover:opacity-80 transition-opacity"
+              className="font-semibold hover:opacity-80 transition-opacity"
+              style={{ color: TELEGRAM_COLORS.text }}
             >
               Systems Trader
             </Link>
-            <span className="text-gray-600">/</span>
-            <span className="text-gray-500">Chat</span>
+            <span style={{ color: TELEGRAM_COLORS.hint }}>/</span>
+            <span style={{ color: TELEGRAM_COLORS.hint }}>Chat</span>
             {selectedChannel && (
               <>
-                <span className="text-gray-600">/</span>
-                <span className="text-gray-400">
+                <span style={{ color: TELEGRAM_COLORS.hint }}>/</span>
+                <span style={{ color: TELEGRAM_COLORS.accent }}>
                   {selectedChannel.icon} {selectedChannel.name}
                 </span>
               </>
@@ -949,7 +1001,8 @@ function ChatPageContent() {
             {/* Search */}
             <button
               onClick={() => setShowSearch(true)}
-              className="p-2 text-gray-400 hover:text-white transition-colors"
+              className="p-2 transition-colors"
+              style={{ color: TELEGRAM_COLORS.hint }}
               title="Search"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -966,14 +1019,18 @@ function ChatPageContent() {
                     markNotificationsRead();
                   }
                 }}
-                className="p-2 text-gray-400 hover:text-white transition-colors relative"
+                className="p-2 transition-colors relative"
+                style={{ color: TELEGRAM_COLORS.hint }}
                 title="Notifications"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
                 </svg>
                 {unreadNotifications > 0 && (
-                  <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full text-xs flex items-center justify-center">
+                  <span
+                    className="absolute -top-1 -right-1 w-5 h-5 rounded-full text-xs flex items-center justify-center"
+                    style={{ backgroundColor: TELEGRAM_COLORS.destructive, color: "#fff" }}
+                  >
                     {unreadNotifications > 9 ? "9+" : unreadNotifications}
                   </span>
                 )}
@@ -981,21 +1038,35 @@ function ChatPageContent() {
 
               {/* Notifications dropdown */}
               {showNotifications && (
-                <div className="absolute right-0 top-full mt-2 w-80 bg-gray-800 rounded-lg shadow-xl border border-gray-700 max-h-96 overflow-y-auto z-50">
-                  <div className="p-3 border-b border-gray-700 font-medium">
+                <div
+                  className="absolute right-0 top-full mt-2 w-80 rounded-lg shadow-xl max-h-96 overflow-y-auto z-50"
+                  style={{
+                    backgroundColor: TELEGRAM_COLORS.secondaryBg,
+                    border: `1px solid ${TELEGRAM_COLORS.border}`,
+                  }}
+                >
+                  <div
+                    className="p-3 font-medium"
+                    style={{
+                      color: TELEGRAM_COLORS.text,
+                      borderBottom: `1px solid ${TELEGRAM_COLORS.border}`,
+                    }}
+                  >
                     Notifications
                   </div>
                   {notifications.length === 0 ? (
-                    <div className="p-4 text-center text-gray-500">
+                    <div className="p-4 text-center" style={{ color: TELEGRAM_COLORS.hint }}>
                       No notifications
                     </div>
                   ) : (
                     notifications.map((n) => (
                       <div
                         key={n.id}
-                        className={`p-3 border-b border-gray-700/50 hover:bg-gray-700/50 cursor-pointer ${
-                          !n.read ? "bg-blue-500/10" : ""
-                        }`}
+                        className="p-3 cursor-pointer hover:opacity-80"
+                        style={{
+                          borderBottom: `1px solid ${TELEGRAM_COLORS.border}50`,
+                          backgroundColor: !n.read ? `${TELEGRAM_COLORS.primary}20` : "transparent",
+                        }}
                         onClick={() => {
                           if (n.link) {
                             window.location.href = n.link;
@@ -1003,9 +1074,9 @@ function ChatPageContent() {
                           setShowNotifications(false);
                         }}
                       >
-                        <div className="font-medium text-sm">{n.title}</div>
-                        <div className="text-xs text-gray-400 mt-1">{n.body}</div>
-                        <div className="text-xs text-gray-500 mt-1">
+                        <div className="font-medium text-sm" style={{ color: TELEGRAM_COLORS.text }}>{n.title}</div>
+                        <div className="text-xs mt-1" style={{ color: TELEGRAM_COLORS.hint }}>{n.body}</div>
+                        <div className="text-xs mt-1" style={{ color: TELEGRAM_COLORS.hint }}>
                           {formatTime(n.createdAt)}
                         </div>
                       </div>
@@ -1015,10 +1086,40 @@ function ChatPageContent() {
               )}
             </div>
 
+            {/* Friend Requests Button */}
+            <button
+              onClick={() => setShowFriendRequests(true)}
+              className="p-2 transition-colors hover:opacity-80"
+              style={{ color: TELEGRAM_COLORS.hint }}
+              title="Friend Requests"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+              </svg>
+            </button>
+
+            {/* Admin Panel Button */}
+            {isAdmin && (
+              <button
+                onClick={() => setShowAdminPanel(true)}
+                className="p-2 transition-colors hover:opacity-80"
+                style={{ color: TELEGRAM_COLORS.primary }}
+                title="Admin Panel"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+              </button>
+            )}
+
             {/* Online count */}
             <div className="flex items-center gap-2">
-              <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-              <span className="text-sm text-gray-400">
+              <div
+                className="w-2 h-2 rounded-full"
+                style={{ backgroundColor: TELEGRAM_COLORS.online }}
+              ></div>
+              <span className="text-sm" style={{ color: TELEGRAM_COLORS.hint }}>
                 {onlineUsers.length} online
               </span>
             </div>
@@ -1028,30 +1129,39 @@ function ChatPageContent() {
 
       <div className="flex-1 flex overflow-hidden">
         {/* Sidebar */}
-        <aside className="w-64 border-r border-gray-800 bg-gray-900/30 flex flex-col">
+        <aside
+          className="w-64 flex flex-col"
+          style={{
+            backgroundColor: TELEGRAM_COLORS.secondaryBg,
+            borderRight: `1px solid ${TELEGRAM_COLORS.border}`,
+          }}
+        >
           {/* View Mode Tabs */}
-          <div className="flex border-b border-gray-800">
+          <div className="flex" style={{ borderBottom: `1px solid ${TELEGRAM_COLORS.border}` }}>
             <button
               onClick={() => setViewMode("channels")}
-              className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${
-                viewMode === "channels"
-                  ? "text-white border-b-2 border-blue-500"
-                  : "text-gray-400 hover:text-gray-200"
-              }`}
+              className="flex-1 px-4 py-3 text-sm font-medium transition-colors"
+              style={{
+                color: viewMode === "channels" ? TELEGRAM_COLORS.text : TELEGRAM_COLORS.hint,
+                borderBottom: viewMode === "channels" ? `2px solid ${TELEGRAM_COLORS.primary}` : "2px solid transparent",
+              }}
             >
               Channels
             </button>
             <button
               onClick={() => setViewMode("dms")}
-              className={`flex-1 px-4 py-3 text-sm font-medium transition-colors relative ${
-                viewMode === "dms"
-                  ? "text-white border-b-2 border-blue-500"
-                  : "text-gray-400 hover:text-gray-200"
-              }`}
+              className="flex-1 px-4 py-3 text-sm font-medium transition-colors relative"
+              style={{
+                color: viewMode === "dms" ? TELEGRAM_COLORS.text : TELEGRAM_COLORS.hint,
+                borderBottom: viewMode === "dms" ? `2px solid ${TELEGRAM_COLORS.primary}` : "2px solid transparent",
+              }}
             >
               DMs
               {conversations.reduce((sum, c) => sum + c.unreadCount, 0) > 0 && (
-                <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full"></span>
+                <span
+                  className="absolute top-2 right-2 w-2 h-2 rounded-full"
+                  style={{ backgroundColor: TELEGRAM_COLORS.destructive }}
+                ></span>
               )}
             </button>
           </div>
@@ -1062,12 +1172,16 @@ function ChatPageContent() {
               <div className="p-3">
                 {/* Channel List */}
                 <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-xs font-semibold text-gray-500 uppercase">
+                  <h3
+                    className="text-xs font-semibold uppercase"
+                    style={{ color: TELEGRAM_COLORS.hint }}
+                  >
                     Channels
                   </h3>
                   <button
                     onClick={() => setShowChannelModal(true)}
-                    className="p-1 text-gray-400 hover:text-white transition-colors"
+                    className="p-1 transition-colors hover:opacity-80"
+                    style={{ color: TELEGRAM_COLORS.hint }}
                     title="Create channel"
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1079,11 +1193,11 @@ function ChatPageContent() {
                   {/* Global chat (no channel) */}
                   <button
                     onClick={() => setSelectedChannelId(null)}
-                    className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg transition-colors text-left ${
-                      selectedChannelId === null
-                        ? "bg-gray-800 text-white"
-                        : "text-gray-400 hover:bg-gray-800/50 hover:text-gray-200"
-                    }`}
+                    className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg transition-colors text-left"
+                    style={{
+                      backgroundColor: selectedChannelId === null ? TELEGRAM_COLORS.selection : "transparent",
+                      color: selectedChannelId === null ? TELEGRAM_COLORS.text : TELEGRAM_COLORS.hint,
+                    }}
                   >
                     <span>🌐</span>
                     <span className="flex-1 truncate">Global</span>
@@ -1093,16 +1207,19 @@ function ChatPageContent() {
                     <button
                       key={channel.id}
                       onClick={() => setSelectedChannelId(channel.id)}
-                      className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg transition-colors text-left ${
-                        selectedChannelId === channel.id
-                          ? "bg-gray-800 text-white"
-                          : "text-gray-400 hover:bg-gray-800/50 hover:text-gray-200"
-                      }`}
+                      className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg transition-colors text-left"
+                      style={{
+                        backgroundColor: selectedChannelId === channel.id ? TELEGRAM_COLORS.selection : "transparent",
+                        color: selectedChannelId === channel.id ? TELEGRAM_COLORS.text : TELEGRAM_COLORS.hint,
+                      }}
                     >
                       <span>{channel.icon || "#"}</span>
                       <span className="flex-1 truncate">{channel.name}</span>
                       {channel.unreadCount > 0 && (
-                        <span className="w-5 h-5 bg-blue-500 rounded-full text-xs flex items-center justify-center text-white">
+                        <span
+                          className="w-5 h-5 rounded-full text-xs flex items-center justify-center"
+                          style={{ backgroundColor: TELEGRAM_COLORS.primary, color: "#fff" }}
+                        >
                           {channel.unreadCount > 9 ? "9+" : channel.unreadCount}
                         </span>
                       )}
@@ -1111,7 +1228,10 @@ function ChatPageContent() {
                 </div>
 
                 {/* Online Users */}
-                <h3 className="text-xs font-semibold text-gray-500 uppercase mt-6 mb-3">
+                <h3
+                  className="text-xs font-semibold uppercase mt-6 mb-3"
+                  style={{ color: TELEGRAM_COLORS.hint }}
+                >
                   Online ({onlineUsers.length})
                 </h3>
                 <div className="space-y-1">
@@ -1119,7 +1239,8 @@ function ChatPageContent() {
                     <button
                       key={user.id}
                       onClick={() => startDMWithUser(user.userId)}
-                      className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-gray-800/50 transition-colors text-left"
+                      className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg transition-colors text-left hover:opacity-80"
+                      style={{ backgroundColor: "transparent" }}
                     >
                       <div className="relative">
                         {user.userAvatar ? (
@@ -1129,13 +1250,25 @@ function ChatPageContent() {
                             className="w-6 h-6 rounded-full"
                           />
                         ) : (
-                          <div className="w-6 h-6 rounded-full bg-gray-700 flex items-center justify-center text-xs">
+                          <div
+                            className="w-6 h-6 rounded-full flex items-center justify-center text-xs"
+                            style={{ backgroundColor: TELEGRAM_COLORS.secondaryBg, color: TELEGRAM_COLORS.text }}
+                          >
                             {user.userName[0]?.toUpperCase()}
                           </div>
                         )}
-                        <div className="absolute bottom-0 right-0 w-2 h-2 bg-green-500 rounded-full border border-gray-900"></div>
+                        <div
+                          className="absolute bottom-0 right-0 w-2 h-2 rounded-full"
+                          style={{
+                            backgroundColor: TELEGRAM_COLORS.online,
+                            border: `1px solid ${TELEGRAM_COLORS.secondaryBg}`,
+                          }}
+                        ></div>
                       </div>
-                      <span className="text-sm truncate flex-1 text-gray-300">
+                      <span
+                        className="text-sm truncate flex-1"
+                        style={{ color: TELEGRAM_COLORS.text }}
+                      >
                         {user.userName}
                       </span>
                     </button>
@@ -1144,7 +1277,10 @@ function ChatPageContent() {
               </div>
             ) : (
               <div className="p-3">
-                <h3 className="text-xs font-semibold text-gray-500 uppercase mb-3">
+                <h3
+                  className="text-xs font-semibold uppercase mb-3"
+                  style={{ color: TELEGRAM_COLORS.hint }}
+                >
                   Conversations
                 </h3>
                 <div className="space-y-1">
@@ -1152,11 +1288,10 @@ function ChatPageContent() {
                     <button
                       key={conv.partnerId}
                       onClick={() => setSelectedDM(conv.partnerId)}
-                      className={`w-full flex items-center gap-2 px-2 py-2 rounded-lg transition-colors text-left ${
-                        selectedDM === conv.partnerId
-                          ? "bg-gray-800"
-                          : "hover:bg-gray-800/50"
-                      }`}
+                      className="w-full flex items-center gap-2 px-2 py-2 rounded-lg transition-colors text-left"
+                      style={{
+                        backgroundColor: selectedDM === conv.partnerId ? TELEGRAM_COLORS.selection : "transparent",
+                      }}
                     >
                       {conv.partnerAvatar ? (
                         <img
@@ -1165,33 +1300,51 @@ function ChatPageContent() {
                           className="w-10 h-10 rounded-full"
                         />
                       ) : (
-                        <div className="w-10 h-10 rounded-full bg-gray-700 flex items-center justify-center text-sm">
+                        <div
+                          className="w-10 h-10 rounded-full flex items-center justify-center text-sm"
+                          style={{ backgroundColor: TELEGRAM_COLORS.secondaryBg, color: TELEGRAM_COLORS.text }}
+                        >
                           {conv.partnerName[0]?.toUpperCase()}
                         </div>
                       )}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between">
-                          <span className="text-sm font-medium truncate">
+                          <span
+                            className="text-sm font-medium truncate"
+                            style={{ color: TELEGRAM_COLORS.text }}
+                          >
                             {conv.partnerName}
                           </span>
-                          <span className="text-xs text-gray-500">
+                          <span
+                            className="text-xs"
+                            style={{ color: TELEGRAM_COLORS.hint }}
+                          >
                             {formatTime(conv.lastMessage.createdAt)}
                           </span>
                         </div>
-                        <p className="text-xs text-gray-400 truncate">
+                        <p
+                          className="text-xs truncate"
+                          style={{ color: TELEGRAM_COLORS.hint }}
+                        >
                           {conv.lastMessage.isFromMe && "You: "}
                           {conv.lastMessage.content}
                         </p>
                       </div>
                       {conv.unreadCount > 0 && (
-                        <span className="w-5 h-5 flex items-center justify-center bg-blue-500 rounded-full text-xs">
+                        <span
+                          className="w-5 h-5 flex items-center justify-center rounded-full text-xs"
+                          style={{ backgroundColor: TELEGRAM_COLORS.primary, color: "#fff" }}
+                        >
                           {conv.unreadCount}
                         </span>
                       )}
                     </button>
                   ))}
                   {conversations.length === 0 && (
-                    <p className="text-gray-500 text-sm text-center py-4">
+                    <p
+                      className="text-sm text-center py-4"
+                      style={{ color: TELEGRAM_COLORS.hint }}
+                    >
                       No conversations yet
                     </p>
                   )}
@@ -1202,12 +1355,18 @@ function ChatPageContent() {
         </aside>
 
         {/* Main Chat Area */}
-        <div className="flex-1 flex flex-col">
+        <div
+          className="flex-1 flex flex-col"
+          style={{ backgroundColor: TELEGRAM_COLORS.bgColor }}
+        >
           {isLoading ? (
             <div className="flex-1 flex items-center justify-center">
               <div className="flex items-center gap-3">
-                <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-                <span className="text-gray-400">Loading chat...</span>
+                <div
+                  className="w-5 h-5 border-2 border-t-transparent rounded-full animate-spin"
+                  style={{ borderColor: TELEGRAM_COLORS.primary, borderTopColor: "transparent" }}
+                />
+                <span style={{ color: TELEGRAM_COLORS.hint }}>Loading chat...</span>
               </div>
             </div>
           ) : viewMode === "channels" ? (
@@ -1217,164 +1376,243 @@ function ChatPageContent() {
                 {groupedMessages.map((group) => (
                   <div key={group.date}>
                     {/* Date separator */}
-                    <div className="flex items-center gap-4 my-4">
-                      <div className="flex-1 h-px bg-gray-800"></div>
-                      <span className="text-xs text-gray-500">{group.date}</span>
-                      <div className="flex-1 h-px bg-gray-800"></div>
+                    <div className="flex items-center justify-center my-4">
+                      <span
+                        className="text-xs px-3 py-1 rounded-full"
+                        style={{
+                          backgroundColor: TELEGRAM_COLORS.secondaryBg,
+                          color: TELEGRAM_COLORS.hint,
+                        }}
+                      >
+                        {group.date}
+                      </span>
                     </div>
 
                     {/* Messages for this date */}
-                    <div className="space-y-4">
-                      {group.messages.map((message) => (
-                        <div
-                          key={message.id}
-                          className={`group flex gap-3 ${
-                            message.userId === session.user?.id ? "flex-row-reverse" : ""
-                          }`}
-                        >
-                          {/* Avatar */}
-                          {message.userAvatar ? (
-                            <img
-                              src={message.userAvatar}
-                              alt=""
-                              className="w-10 h-10 rounded-full flex-shrink-0"
-                            />
-                          ) : (
-                            <div className="w-10 h-10 rounded-full bg-gray-700 flex items-center justify-center text-sm flex-shrink-0">
-                              {message.userName[0]?.toUpperCase()}
-                            </div>
-                          )}
-
-                          {/* Message Content */}
+                    <div className="space-y-2">
+                      {group.messages.map((message) => {
+                        const isOwn = message.userId === session.user?.id;
+                        return (
                           <div
-                            className={`flex flex-col max-w-[70%] ${
-                              message.userId === session.user?.id ? "items-end" : "items-start"
-                            }`}
+                            key={message.id}
+                            className={`group flex gap-2 ${isOwn ? "flex-row-reverse" : ""}`}
                           >
-                            {/* Header */}
-                            <div className="flex items-center gap-2 mb-1">
-                              <span className="text-sm font-medium">{message.userName}</span>
-                              {message.isVip && (
-                                <span className="text-xs bg-yellow-500/20 text-yellow-500 px-1.5 py-0.5 rounded">
-                                  VIP
-                                </span>
-                              )}
-                              <span className="text-xs text-gray-500">
-                                {formatTime(message.createdAt)}
-                              </span>
-                              {message.edited && (
-                                <span className="text-xs text-gray-500">(edited)</span>
-                              )}
-                            </div>
-
-                            {/* Reply Reference */}
-                            {message.replyTo && (
-                              <div className="text-xs text-gray-400 mb-1 px-2 py-1 bg-gray-800/50 rounded border-l-2 border-gray-600">
-                                <span className="font-medium">{message.replyTo.userName}:</span>{" "}
-                                {message.replyTo.content.slice(0, 50)}
-                                {message.replyTo.content.length > 50 && "..."}
-                              </div>
-                            )}
-
-                            {/* Message Bubble */}
-                            <div
-                              className={`px-4 py-2 rounded-2xl ${
-                                message.userId === session.user?.id
-                                  ? "bg-blue-600 text-white"
-                                  : "bg-gray-800 text-gray-100"
-                              }`}
-                            >
-                              {renderMessageContent(message.content)}
-                            </div>
-
-                            {/* Reactions */}
-                            {message.reactions.length > 0 && (
-                              <div className="flex flex-wrap gap-1 mt-1">
-                                {message.reactions.map((reaction) => (
-                                  <button
-                                    key={reaction.emoji}
-                                    onClick={() => toggleReaction(message.id, reaction.emoji)}
-                                    className={`text-xs px-2 py-0.5 rounded-full flex items-center gap-1 ${
-                                      reaction.userReacted
-                                        ? "bg-blue-500/30 border border-blue-500"
-                                        : "bg-gray-700/50 border border-gray-600"
-                                    }`}
-                                  >
-                                    <span>{reaction.emoji}</span>
-                                    <span>{reaction.count}</span>
-                                  </button>
-                                ))}
-                              </div>
-                            )}
-
-                            {/* Actions */}
-                            <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 mt-1">
+                            {/* Avatar - only show for others, clickable */}
+                            {!isOwn && (
                               <button
-                                onClick={() => setReplyingTo(message)}
-                                className="p-1 text-gray-400 hover:text-white transition-colors"
-                                title="Reply"
+                                onClick={() => {
+                                  setSelectedProfileUser({
+                                    id: message.userId,
+                                    name: message.userName,
+                                    image: message.userAvatar,
+                                  });
+                                  setShowUserProfile(true);
+                                }}
+                                className="flex-shrink-0 mt-auto cursor-pointer hover:opacity-80"
                               >
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
-                                </svg>
-                              </button>
-                              <div className="relative">
-                                <button
-                                  onClick={() =>
-                                    setShowEmojiPicker(showEmojiPicker === message.id ? null : message.id)
-                                  }
-                                  className="p-1 text-gray-400 hover:text-white transition-colors"
-                                  title="React"
-                                >
-                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                  </svg>
-                                </button>
-                                {showEmojiPicker === message.id && (
-                                  <div className="absolute bottom-full left-0 mb-1 bg-gray-800 rounded-lg p-2 flex gap-1 shadow-xl z-10">
-                                    {EMOJI_OPTIONS.map((emoji) => (
-                                      <button
-                                        key={emoji}
-                                        onClick={() => toggleReaction(message.id, emoji)}
-                                        className="hover:scale-125 transition-transform p-1"
-                                      >
-                                        {emoji}
-                                      </button>
-                                    ))}
+                                {message.userAvatar ? (
+                                  <img
+                                    src={message.userAvatar}
+                                    alt=""
+                                    className="w-8 h-8 rounded-full"
+                                  />
+                                ) : (
+                                  <div
+                                    className="w-8 h-8 rounded-full flex items-center justify-center text-xs"
+                                    style={{ backgroundColor: TELEGRAM_COLORS.secondaryBg, color: TELEGRAM_COLORS.text }}
+                                  >
+                                    {message.userName[0]?.toUpperCase()}
                                   </div>
                                 )}
-                              </div>
-                              {message.userId === session.user?.id && (
-                                <>
-                                  <button
-                                    onClick={() => startEdit(message)}
-                                    className="p-1 text-gray-400 hover:text-white transition-colors"
-                                    title="Edit"
-                                  >
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                    </svg>
-                                  </button>
-                                  <button
-                                    onClick={() => deleteMessage(message.id)}
-                                    className="p-1 text-gray-400 hover:text-red-400 transition-colors"
-                                    title="Delete"
-                                  >
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                    </svg>
-                                  </button>
-                                </>
+                              </button>
+                            )}
+
+                            {/* Message Content */}
+                            <div
+                              className={`flex flex-col max-w-[70%] ${isOwn ? "items-end" : "items-start"}`}
+                            >
+                              {/* Reply Reference */}
+                              {message.replyTo && (
+                                <div
+                                  className="text-xs mb-1 px-2 py-1 rounded"
+                                  style={{
+                                    backgroundColor: isOwn ? "rgba(255,255,255,0.1)" : TELEGRAM_COLORS.secondaryBg,
+                                    borderLeft: `2px solid ${TELEGRAM_COLORS.primary}`,
+                                    color: TELEGRAM_COLORS.hint,
+                                  }}
+                                >
+                                  <span style={{ color: TELEGRAM_COLORS.accent }}>{message.replyTo.userName}</span>
+                                  <p className="truncate">{message.replyTo.content.slice(0, 50)}</p>
+                                </div>
                               )}
+
+                              {/* Message Bubble with Telegram style */}
+                              <div className="relative">
+                                <div
+                                  className="px-3 py-2 relative"
+                                  style={{
+                                    backgroundColor: isOwn ? TELEGRAM_COLORS.outgoingBubble : TELEGRAM_COLORS.incomingBubble,
+                                    color: TELEGRAM_COLORS.text,
+                                    borderRadius: isOwn ? "18px 18px 4px 18px" : "18px 18px 18px 4px",
+                                    minWidth: "60px",
+                                  }}
+                                >
+                                  {/* Header - show name for others, clickable */}
+                                  {!isOwn && (
+                                    <div className="flex items-center gap-2 mb-0.5">
+                                      <button
+                                        onClick={() => {
+                                          setSelectedProfileUser({
+                                            id: message.userId,
+                                            name: message.userName,
+                                            image: message.userAvatar,
+                                          });
+                                          setShowUserProfile(true);
+                                        }}
+                                        className="text-sm font-medium hover:underline cursor-pointer"
+                                        style={{ color: TELEGRAM_COLORS.accent }}
+                                      >
+                                        {message.userName}
+                                      </button>
+                                      {message.isVip && (
+                                        <span
+                                          className="text-xs px-1.5 py-0.5 rounded"
+                                          style={{ backgroundColor: "rgba(255, 193, 7, 0.2)", color: "#ffc107" }}
+                                        >
+                                          VIP
+                                        </span>
+                                      )}
+                                    </div>
+                                  )}
+
+                                  {/* Message Text */}
+                                  <div className="break-words whitespace-pre-wrap">
+                                    {renderMessageContent(message.content)}
+                                  </div>
+
+                                  {/* Time and status */}
+                                  <div
+                                    className="flex items-center gap-1 justify-end mt-1"
+                                    style={{ color: isOwn ? "rgba(255,255,255,0.6)" : TELEGRAM_COLORS.hint }}
+                                  >
+                                    {message.edited && (
+                                      <span className="text-xs">edited</span>
+                                    )}
+                                    <span className="text-xs">{formatTime(message.createdAt)}</span>
+                                    {isOwn && (
+                                      <svg className="w-4 h-4" viewBox="0 0 16 16" fill="currentColor">
+                                        <path d="M12.354 4.354a.5.5 0 0 0-.708-.708L5 10.293 2.354 7.646a.5.5 0 1 0-.708.708l3 3a.5.5 0 0 0 .708 0l7-7z"/>
+                                        <path d="M6.354 11.354a.5.5 0 0 1-.708 0l-3-3a.5.5 0 0 1 .708-.708L6 10.293l6.646-6.647a.5.5 0 0 1 .708.708l-7 7z"/>
+                                      </svg>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Reactions */}
+                              {message.reactions.length > 0 && (
+                                <div className="flex flex-wrap gap-1 mt-1">
+                                  {message.reactions.map((reaction) => (
+                                    <button
+                                      key={reaction.emoji}
+                                      onClick={() => toggleReaction(message.id, reaction.emoji)}
+                                      className="text-xs px-2 py-0.5 rounded-full flex items-center gap-1 transition-transform hover:scale-110"
+                                      style={{
+                                        backgroundColor: reaction.userReacted
+                                          ? `${TELEGRAM_COLORS.primary}40`
+                                          : TELEGRAM_COLORS.secondaryBg,
+                                        border: reaction.userReacted
+                                          ? `1px solid ${TELEGRAM_COLORS.primary}`
+                                          : `1px solid ${TELEGRAM_COLORS.border}`,
+                                        color: TELEGRAM_COLORS.text,
+                                      }}
+                                    >
+                                      <span>{reaction.emoji}</span>
+                                      <span>{reaction.count}</span>
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+
+                              {/* Actions */}
+                              <div
+                                className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 mt-1"
+                                style={{ color: TELEGRAM_COLORS.hint }}
+                              >
+                                <button
+                                  onClick={() => setReplyingTo(message)}
+                                  className="p-1 hover:opacity-80 transition-opacity"
+                                  title="Reply"
+                                >
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                                  </svg>
+                                </button>
+                                <div className="relative">
+                                  <button
+                                    onClick={() =>
+                                      setShowEmojiPicker(showEmojiPicker === message.id ? null : message.id)
+                                    }
+                                    className="p-1 hover:opacity-80 transition-opacity"
+                                    title="React"
+                                  >
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                  </button>
+                                  {showEmojiPicker === message.id && (
+                                    <div
+                                      className="absolute bottom-full left-0 mb-1 rounded-lg p-2 flex gap-1 shadow-xl z-10"
+                                      style={{ backgroundColor: TELEGRAM_COLORS.secondaryBg }}
+                                    >
+                                      {EMOJI_OPTIONS.map((emoji) => (
+                                        <button
+                                          key={emoji}
+                                          onClick={() => toggleReaction(message.id, emoji)}
+                                          className="hover:scale-125 transition-transform p-1"
+                                        >
+                                          {emoji}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                                {isOwn && (
+                                  <>
+                                    <button
+                                      onClick={() => startEdit(message)}
+                                      className="p-1 hover:opacity-80 transition-opacity"
+                                      title="Edit"
+                                    >
+                                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                      </svg>
+                                    </button>
+                                    <button
+                                      onClick={() => deleteMessage(message.id)}
+                                      className="p-1 transition-opacity"
+                                      style={{ color: TELEGRAM_COLORS.destructive }}
+                                      title="Delete"
+                                    >
+                                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                      </svg>
+                                    </button>
+                                  </>
+                                )}
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
                 ))}
                 {messages.length === 0 && (
-                  <div className="flex items-center justify-center h-full text-gray-500">
+                  <div
+                    className="flex items-center justify-center h-full"
+                    style={{ color: TELEGRAM_COLORS.hint }}
+                  >
                     No messages yet. Start the conversation!
                   </div>
                 )}
@@ -1383,25 +1621,35 @@ function ChatPageContent() {
 
               {/* Typing indicator */}
               {typingUsers.length > 0 && (
-                <div className="px-4 py-2 text-sm text-gray-400">
-                  {typingUsers.map((u) => u.userName).join(", ")}{" "}
-                  {typingUsers.length === 1 ? "is" : "are"} typing...
-                </div>
+                <TypingIndicator users={typingUsers} />
               )}
 
               {/* Input Area */}
-              <div className="border-t border-gray-800 p-4">
+              <div
+                className="p-4"
+                style={{
+                  backgroundColor: TELEGRAM_COLORS.headerBg,
+                  borderTop: `1px solid ${TELEGRAM_COLORS.border}`,
+                }}
+              >
                 {/* Reply indicator */}
                 {replyingTo && (
-                  <div className="flex items-center justify-between mb-2 px-3 py-2 bg-gray-800/50 rounded-lg">
+                  <div
+                    className="flex items-center justify-between mb-2 px-3 py-2 rounded-lg"
+                    style={{
+                      backgroundColor: TELEGRAM_COLORS.secondaryBg,
+                      borderLeft: `2px solid ${TELEGRAM_COLORS.primary}`,
+                    }}
+                  >
                     <div className="text-sm">
-                      <span className="text-gray-400">Replying to </span>
-                      <span className="text-white font-medium">{replyingTo.userName}</span>
-                      <p className="text-gray-500 truncate">{replyingTo.content.slice(0, 50)}</p>
+                      <span style={{ color: TELEGRAM_COLORS.hint }}>Replying to </span>
+                      <span style={{ color: TELEGRAM_COLORS.accent }}>{replyingTo.userName}</span>
+                      <p style={{ color: TELEGRAM_COLORS.hint }} className="truncate">{replyingTo.content.slice(0, 50)}</p>
                     </div>
                     <button
                       onClick={() => setReplyingTo(null)}
-                      className="text-gray-400 hover:text-white"
+                      className="hover:opacity-80"
+                      style={{ color: TELEGRAM_COLORS.hint }}
                     >
                       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -1412,13 +1660,20 @@ function ChatPageContent() {
 
                 {/* Edit indicator */}
                 {editingMessage && (
-                  <div className="flex items-center justify-between mb-2 px-3 py-2 bg-yellow-500/10 rounded-lg border border-yellow-500/30">
+                  <div
+                    className="flex items-center justify-between mb-2 px-3 py-2 rounded-lg"
+                    style={{
+                      backgroundColor: "rgba(255, 193, 7, 0.1)",
+                      borderLeft: "2px solid #ffc107",
+                    }}
+                  >
                     <div className="text-sm">
-                      <span className="text-yellow-500 font-medium">Editing message</span>
+                      <span style={{ color: "#ffc107" }} className="font-medium">Editing message</span>
                     </div>
                     <button
                       onClick={cancelEdit}
-                      className="text-gray-400 hover:text-white"
+                      className="hover:opacity-80"
+                      style={{ color: TELEGRAM_COLORS.hint }}
                     >
                       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -1429,34 +1684,73 @@ function ChatPageContent() {
 
                 {/* @mention dropdown */}
                 {showMentions && mentionUsers.length > 0 && (
-                  <div className="mb-2 bg-gray-800 rounded-lg shadow-xl border border-gray-700 max-h-48 overflow-y-auto">
+                  <div
+                    className="mb-2 rounded-lg shadow-xl max-h-48 overflow-y-auto"
+                    style={{
+                      backgroundColor: TELEGRAM_COLORS.secondaryBg,
+                      border: `1px solid ${TELEGRAM_COLORS.border}`,
+                    }}
+                  >
                     {mentionUsers.map((user, i) => (
                       <button
                         key={user.id}
                         onClick={() => insertMention(user)}
-                        className={`w-full flex items-center gap-2 px-3 py-2 text-left ${
-                          i === mentionIndex ? "bg-blue-500/30" : "hover:bg-gray-700/50"
-                        }`}
+                        className="w-full flex items-center gap-2 px-3 py-2 text-left"
+                        style={{
+                          backgroundColor: i === mentionIndex ? `${TELEGRAM_COLORS.primary}30` : "transparent",
+                          color: TELEGRAM_COLORS.text,
+                        }}
                       >
                         {user.image ? (
                           <img src={user.image} alt="" className="w-6 h-6 rounded-full" />
                         ) : (
-                          <div className="w-6 h-6 rounded-full bg-gray-600 flex items-center justify-center text-xs">
+                          <div
+                            className="w-6 h-6 rounded-full flex items-center justify-center text-xs"
+                            style={{ backgroundColor: TELEGRAM_COLORS.bgColor, color: TELEGRAM_COLORS.text }}
+                          >
                             {(user.name || user.email)[0]?.toUpperCase()}
                           </div>
                         )}
                         <span className="text-sm">{user.name || user.email}</span>
                         <span
-                          className={`w-2 h-2 rounded-full ${
-                            user.status === "online" ? "bg-green-500" : "bg-gray-500"
-                          }`}
+                          className="w-2 h-2 rounded-full"
+                          style={{
+                            backgroundColor: user.status === "online" ? TELEGRAM_COLORS.online : TELEGRAM_COLORS.hint,
+                          }}
                         ></span>
                       </button>
                     ))}
                   </div>
                 )}
 
-                <div className="flex items-end gap-2">
+                {/* Emoji Picker */}
+                <EmojiPicker
+                  isOpen={showInputEmoji}
+                  onClose={() => setShowInputEmoji(false)}
+                  onEmojiSelect={(emoji) => {
+                    setInputValue((prev) => prev + emoji);
+                    inputRef.current?.focus();
+                  }}
+                  onGifSelect={(gifUrl) => {
+                    // Send GIF as message
+                    setInputValue(`[GIF](${gifUrl})`);
+                    inputRef.current?.focus();
+                  }}
+                />
+
+                <div className="flex items-end gap-2 relative">
+                  {/* Emoji button */}
+                  <button
+                    onClick={() => setShowInputEmoji(!showInputEmoji)}
+                    className="p-3 rounded-full transition-colors hover:opacity-80"
+                    style={{ color: TELEGRAM_COLORS.hint }}
+                    title="Emoji"
+                  >
+                    <svg className="w-6 h-6" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-5-6c.78 2.34 2.72 4 5 4s4.22-1.66 5-4H7zm8-4c.55 0 1-.45 1-1s-.45-1-1-1-1 .45-1 1 .45 1 1 1zm-6 0c.55 0 1-.45 1-1s-.45-1-1-1-1 .45-1 1 .45 1 1 1z"/>
+                    </svg>
+                  </button>
+
                   <textarea
                     ref={inputRef}
                     value={inputValue}
@@ -1464,35 +1758,66 @@ function ChatPageContent() {
                     onKeyDown={handleKeyDown}
                     placeholder={editingMessage ? "Edit your message..." : "Type a message... (@ to mention)"}
                     rows={1}
-                    className="flex-1 px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl
-                             text-white placeholder-gray-500 focus:outline-none focus:border-blue-500
-                             resize-none max-h-32"
-                    style={{ minHeight: "48px" }}
+                    className="flex-1 px-4 py-3 rounded-2xl resize-none max-h-32 focus:outline-none"
+                    style={{
+                      backgroundColor: TELEGRAM_COLORS.inputBg,
+                      border: `1px solid ${TELEGRAM_COLORS.border}`,
+                      color: TELEGRAM_COLORS.text,
+                      minHeight: "48px",
+                    }}
                   />
-                  <button
-                    onClick={editingMessage ? saveEdit : sendMessage}
-                    disabled={!inputValue.trim() || isSending}
-                    className="px-4 py-3 bg-blue-600 text-white rounded-xl font-medium
-                             hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {isSending ? (
-                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    ) : (
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-                      </svg>
-                    )}
-                  </button>
+
+                  {/* Voice recorder or Send button */}
+                  {!inputValue.trim() && !editingMessage ? (
+                    <VoiceRecorder
+                      onSend={(audioBlob, duration) => {
+                        // Handle voice message send
+                        console.log("Voice message:", audioBlob, duration);
+                        // TODO: Upload and send voice message
+                      }}
+                      onCancel={() => {
+                        // Handle cancel
+                      }}
+                    />
+                  ) : (
+                    <button
+                      onClick={editingMessage ? saveEdit : sendMessage}
+                      disabled={!inputValue.trim() || isSending}
+                      className="p-3 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      style={{
+                        backgroundColor: TELEGRAM_COLORS.primary,
+                        color: TELEGRAM_COLORS.buttonText,
+                      }}
+                    >
+                      {isSending ? (
+                        <div
+                          className="w-5 h-5 border-2 border-t-transparent rounded-full animate-spin"
+                          style={{ borderColor: "#fff", borderTopColor: "transparent" }}
+                        />
+                      ) : (
+                        <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                          <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
+                        </svg>
+                      )}
+                    </button>
+                  )}
                 </div>
               </div>
             </>
           ) : selectedDM ? (
             // DM View
             <>
-              <div className="border-b border-gray-800 px-4 py-3 flex items-center gap-3">
+              <div
+                className="px-4 py-3 flex items-center gap-3"
+                style={{
+                  backgroundColor: TELEGRAM_COLORS.headerBg,
+                  borderBottom: `1px solid ${TELEGRAM_COLORS.border}`,
+                }}
+              >
                 <button
                   onClick={() => setSelectedDM(null)}
-                  className="text-gray-400 hover:text-white"
+                  className="hover:opacity-80"
+                  style={{ color: TELEGRAM_COLORS.hint }}
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -1509,79 +1834,116 @@ function ChatPageContent() {
                     <>
                       <div className="relative">
                         {avatar ? (
-                          <img src={avatar} alt="" className="w-8 h-8 rounded-full" />
+                          <img src={avatar} alt="" className="w-10 h-10 rounded-full" />
                         ) : (
-                          <div className="w-8 h-8 rounded-full bg-gray-700 flex items-center justify-center text-sm">
+                          <div
+                            className="w-10 h-10 rounded-full flex items-center justify-center text-sm"
+                            style={{ backgroundColor: TELEGRAM_COLORS.secondaryBg, color: TELEGRAM_COLORS.text }}
+                          >
                             {name[0]?.toUpperCase()}
                           </div>
                         )}
                         {isOnline && (
-                          <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-gray-900"></div>
+                          <div
+                            className="absolute bottom-0 right-0 w-3 h-3 rounded-full"
+                            style={{
+                              backgroundColor: TELEGRAM_COLORS.online,
+                              border: `2px solid ${TELEGRAM_COLORS.headerBg}`,
+                            }}
+                          ></div>
                         )}
                       </div>
                       <div>
-                        <span className="font-medium">{name}</span>
-                        <span className="text-xs text-gray-500 ml-2">
-                          {isOnline ? "Online" : "Offline"}
-                        </span>
+                        <span className="font-medium" style={{ color: TELEGRAM_COLORS.text }}>{name}</span>
+                        <p
+                          className="text-xs"
+                          style={{ color: isOnline ? TELEGRAM_COLORS.online : TELEGRAM_COLORS.hint }}
+                        >
+                          {isOnline ? "online" : "offline"}
+                        </p>
                       </div>
                     </>
                   );
                 })()}
               </div>
 
-              <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                {dmMessages.map((message) => (
-                  <div
-                    key={message.id}
-                    className={`flex gap-3 ${
-                      message.senderId === session.user?.id ? "flex-row-reverse" : ""
-                    }`}
-                  >
-                    {message.sender.image ? (
-                      <img
-                        src={message.sender.image}
-                        alt=""
-                        className="w-8 h-8 rounded-full flex-shrink-0"
-                      />
-                    ) : (
-                      <div className="w-8 h-8 rounded-full bg-gray-700 flex items-center justify-center text-sm flex-shrink-0">
-                        {message.sender.name?.[0]?.toUpperCase() || "?"}
-                      </div>
-                    )}
+              <div className="flex-1 overflow-y-auto p-4 space-y-2">
+                {dmMessages.map((message) => {
+                  const isOwn = message.senderId === session.user?.id;
+                  return (
                     <div
-                      className={`max-w-[70%] ${
-                        message.senderId === session.user?.id ? "items-end" : "items-start"
-                      }`}
+                      key={message.id}
+                      className={`flex gap-2 ${isOwn ? "flex-row-reverse" : ""}`}
                     >
+                      {!isOwn && (
+                        message.sender.image ? (
+                          <img
+                            src={message.sender.image}
+                            alt=""
+                            className="w-8 h-8 rounded-full flex-shrink-0 mt-auto"
+                          />
+                        ) : (
+                          <div
+                            className="w-8 h-8 rounded-full flex items-center justify-center text-sm flex-shrink-0 mt-auto"
+                            style={{ backgroundColor: TELEGRAM_COLORS.secondaryBg, color: TELEGRAM_COLORS.text }}
+                          >
+                            {message.sender.name?.[0]?.toUpperCase() || "?"}
+                          </div>
+                        )
+                      )}
                       <div
-                        className={`px-4 py-2 rounded-2xl ${
-                          message.senderId === session.user?.id
-                            ? "bg-blue-600 text-white"
-                            : "bg-gray-800 text-gray-100"
-                        }`}
+                        className={`max-w-[70%] ${isOwn ? "items-end" : "items-start"}`}
                       >
-                        {message.content}
-                      </div>
-                      <div className="flex items-center gap-2 text-xs text-gray-500 mt-1">
-                        <span>{formatTime(message.createdAt)}</span>
-                        {message.senderId === session.user?.id && message.read && (
-                          <span className="text-blue-400">Read</span>
-                        )}
+                        <div
+                          className="px-3 py-2"
+                          style={{
+                            backgroundColor: isOwn ? TELEGRAM_COLORS.outgoingBubble : TELEGRAM_COLORS.incomingBubble,
+                            color: TELEGRAM_COLORS.text,
+                            borderRadius: isOwn ? "18px 18px 4px 18px" : "18px 18px 18px 4px",
+                          }}
+                        >
+                          <div className="break-words whitespace-pre-wrap">{message.content}</div>
+                          <div
+                            className="flex items-center gap-1 justify-end mt-1"
+                            style={{ color: isOwn ? "rgba(255,255,255,0.6)" : TELEGRAM_COLORS.hint }}
+                          >
+                            <span className="text-xs">{formatTime(message.createdAt)}</span>
+                            {isOwn && (
+                              <svg
+                                className="w-4 h-4"
+                                viewBox="0 0 16 16"
+                                fill="currentColor"
+                                style={{ color: message.read ? TELEGRAM_COLORS.primary : "currentColor" }}
+                              >
+                                <path d="M12.354 4.354a.5.5 0 0 0-.708-.708L5 10.293 2.354 7.646a.5.5 0 1 0-.708.708l3 3a.5.5 0 0 0 .708 0l7-7z"/>
+                                <path d="M6.354 11.354a.5.5 0 0 1-.708 0l-3-3a.5.5 0 0 1 .708-.708L6 10.293l6.646-6.647a.5.5 0 0 1 .708.708l-7 7z"/>
+                              </svg>
+                            )}
+                          </div>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
                 {dmMessages.length === 0 && (
-                  <div className="flex items-center justify-center h-full text-gray-500">
+                  <div
+                    className="flex items-center justify-center h-full"
+                    style={{ color: TELEGRAM_COLORS.hint }}
+                  >
                     No messages yet. Say hi!
                   </div>
                 )}
                 <div ref={messagesEndRef} />
               </div>
 
-              <div className="border-t border-gray-800 p-4">
-                <div className="flex items-center gap-2">
+              <div
+                className="p-4"
+                style={{
+                  backgroundColor: TELEGRAM_COLORS.headerBg,
+                  borderTop: `1px solid ${TELEGRAM_COLORS.border}`,
+                }}
+              >
+                <div className="flex items-end gap-2">
                   <textarea
                     ref={inputRef}
                     value={inputValue}
@@ -1594,18 +1956,24 @@ function ChatPageContent() {
                     }}
                     placeholder="Type a message..."
                     rows={1}
-                    className="flex-1 px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl
-                             text-white placeholder-gray-500 focus:outline-none focus:border-blue-500
-                             resize-none"
+                    className="flex-1 px-4 py-3 rounded-2xl resize-none focus:outline-none"
+                    style={{
+                      backgroundColor: TELEGRAM_COLORS.inputBg,
+                      border: `1px solid ${TELEGRAM_COLORS.border}`,
+                      color: TELEGRAM_COLORS.text,
+                    }}
                   />
                   <button
                     onClick={sendDM}
                     disabled={!inputValue.trim() || isSending}
-                    className="px-4 py-3 bg-blue-600 text-white rounded-xl font-medium
-                             hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="p-3 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    style={{
+                      backgroundColor: TELEGRAM_COLORS.primary,
+                      color: TELEGRAM_COLORS.buttonText,
+                    }}
                   >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
                     </svg>
                   </button>
                 </div>
@@ -1613,13 +1981,14 @@ function ChatPageContent() {
             </>
           ) : (
             // No DM selected
-            <div className="flex-1 flex items-center justify-center text-gray-500">
-              <div className="text-center">
+            <div className="flex-1 flex items-center justify-center">
+              <div className="text-center" style={{ color: TELEGRAM_COLORS.hint }}>
                 <svg
-                  className="w-16 h-16 mx-auto mb-4 text-gray-600"
+                  className="w-16 h-16 mx-auto mb-4"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
+                  style={{ color: TELEGRAM_COLORS.secondaryBg }}
                 >
                   <path
                     strokeLinecap="round"
@@ -1638,10 +2007,19 @@ function ChatPageContent() {
 
       {/* Search Modal */}
       {showSearch && (
-        <div className="fixed inset-0 bg-black/50 flex items-start justify-center pt-20 z-50">
-          <div className="w-full max-w-2xl bg-gray-900 rounded-lg shadow-xl border border-gray-800">
-            <div className="p-4 border-b border-gray-800 flex items-center gap-3">
-              <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div className="fixed inset-0 bg-black/70 flex items-start justify-center pt-20 z-50">
+          <div
+            className="w-full max-w-2xl rounded-lg shadow-xl"
+            style={{
+              backgroundColor: TELEGRAM_COLORS.secondaryBg,
+              border: `1px solid ${TELEGRAM_COLORS.border}`,
+            }}
+          >
+            <div
+              className="p-4 flex items-center gap-3"
+              style={{ borderBottom: `1px solid ${TELEGRAM_COLORS.border}` }}
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ color: TELEGRAM_COLORS.hint }}>
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
               <input
@@ -1650,7 +2028,8 @@ function ChatPageContent() {
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && searchMessages()}
                 placeholder="Search messages..."
-                className="flex-1 bg-transparent text-white placeholder-gray-500 focus:outline-none"
+                className="flex-1 bg-transparent focus:outline-none"
+                style={{ color: TELEGRAM_COLORS.text }}
                 autoFocus
               />
               <button
@@ -1659,7 +2038,8 @@ function ChatPageContent() {
                   setSearchQuery("");
                   setSearchResults([]);
                 }}
-                className="text-gray-400 hover:text-white"
+                className="hover:opacity-80"
+                style={{ color: TELEGRAM_COLORS.hint }}
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -1668,14 +2048,15 @@ function ChatPageContent() {
             </div>
             <div className="max-h-96 overflow-y-auto">
               {searchResults.length === 0 ? (
-                <div className="p-8 text-center text-gray-500">
+                <div className="p-8 text-center" style={{ color: TELEGRAM_COLORS.hint }}>
                   {searchQuery ? "No results found" : "Type to search messages"}
                 </div>
               ) : (
                 searchResults.map((msg) => (
                   <div
                     key={msg.id}
-                    className="p-4 border-b border-gray-800/50 hover:bg-gray-800/50 cursor-pointer"
+                    className="p-4 cursor-pointer hover:opacity-80"
+                    style={{ borderBottom: `1px solid ${TELEGRAM_COLORS.border}50` }}
                     onClick={() => {
                       setShowSearch(false);
                       setSearchQuery("");
@@ -1686,10 +2067,10 @@ function ChatPageContent() {
                     }}
                   >
                     <div className="flex items-center gap-2 mb-1">
-                      <span className="font-medium text-sm">{msg.userName}</span>
-                      <span className="text-xs text-gray-500">{formatTime(msg.createdAt)}</span>
+                      <span className="font-medium text-sm" style={{ color: TELEGRAM_COLORS.text }}>{msg.userName}</span>
+                      <span className="text-xs" style={{ color: TELEGRAM_COLORS.hint }}>{formatTime(msg.createdAt)}</span>
                     </div>
-                    <p className="text-gray-300 text-sm">{msg.content}</p>
+                    <p className="text-sm" style={{ color: TELEGRAM_COLORS.text }}>{msg.content}</p>
                   </div>
                 ))
               )}
@@ -1700,13 +2081,23 @@ function ChatPageContent() {
 
       {/* Create Channel Modal */}
       {showChannelModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="w-full max-w-md bg-gray-900 rounded-lg shadow-xl border border-gray-800">
-            <div className="p-4 border-b border-gray-800 flex items-center justify-between">
-              <h2 className="font-semibold">Create Channel</h2>
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
+          <div
+            className="w-full max-w-md rounded-lg shadow-xl"
+            style={{
+              backgroundColor: TELEGRAM_COLORS.secondaryBg,
+              border: `1px solid ${TELEGRAM_COLORS.border}`,
+            }}
+          >
+            <div
+              className="p-4 flex items-center justify-between"
+              style={{ borderBottom: `1px solid ${TELEGRAM_COLORS.border}` }}
+            >
+              <h2 className="font-semibold" style={{ color: TELEGRAM_COLORS.text }}>Create Channel</h2>
               <button
                 onClick={() => setShowChannelModal(false)}
-                className="text-gray-400 hover:text-white"
+                className="hover:opacity-80"
+                style={{ color: TELEGRAM_COLORS.hint }}
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -1715,17 +2106,17 @@ function ChatPageContent() {
             </div>
             <div className="p-4 space-y-4">
               <div>
-                <label className="block text-sm text-gray-400 mb-2">Icon</label>
+                <label className="block text-sm mb-2" style={{ color: TELEGRAM_COLORS.hint }}>Icon</label>
                 <div className="flex gap-2 flex-wrap">
                   {CHANNEL_ICONS.map((icon) => (
                     <button
                       key={icon}
                       onClick={() => setNewChannelIcon(icon)}
-                      className={`w-10 h-10 rounded-lg flex items-center justify-center text-xl ${
-                        newChannelIcon === icon
-                          ? "bg-blue-500/30 border border-blue-500"
-                          : "bg-gray-800 hover:bg-gray-700"
-                      }`}
+                      className="w-10 h-10 rounded-lg flex items-center justify-center text-xl transition-colors"
+                      style={{
+                        backgroundColor: newChannelIcon === icon ? `${TELEGRAM_COLORS.primary}30` : TELEGRAM_COLORS.bgColor,
+                        border: newChannelIcon === icon ? `1px solid ${TELEGRAM_COLORS.primary}` : `1px solid ${TELEGRAM_COLORS.border}`,
+                      }}
                     >
                       {icon}
                     </button>
@@ -1733,40 +2124,55 @@ function ChatPageContent() {
                 </div>
               </div>
               <div>
-                <label className="block text-sm text-gray-400 mb-2">Channel Name</label>
+                <label className="block text-sm mb-2" style={{ color: TELEGRAM_COLORS.hint }}>Channel Name</label>
                 <input
                   type="text"
                   value={newChannelName}
                   onChange={(e) => setNewChannelName(e.target.value)}
                   placeholder="general"
-                  className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg
-                           text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
+                  className="w-full px-3 py-2 rounded-lg focus:outline-none"
+                  style={{
+                    backgroundColor: TELEGRAM_COLORS.inputBg,
+                    border: `1px solid ${TELEGRAM_COLORS.border}`,
+                    color: TELEGRAM_COLORS.text,
+                  }}
                 />
               </div>
               <div>
-                <label className="block text-sm text-gray-400 mb-2">Description (optional)</label>
+                <label className="block text-sm mb-2" style={{ color: TELEGRAM_COLORS.hint }}>Description (optional)</label>
                 <textarea
                   value={newChannelDescription}
                   onChange={(e) => setNewChannelDescription(e.target.value)}
                   placeholder="What's this channel about?"
                   rows={2}
-                  className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg
-                           text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 resize-none"
+                  className="w-full px-3 py-2 rounded-lg resize-none focus:outline-none"
+                  style={{
+                    backgroundColor: TELEGRAM_COLORS.inputBg,
+                    border: `1px solid ${TELEGRAM_COLORS.border}`,
+                    color: TELEGRAM_COLORS.text,
+                  }}
                 />
               </div>
             </div>
-            <div className="p-4 border-t border-gray-800 flex justify-end gap-2">
+            <div
+              className="p-4 flex justify-end gap-2"
+              style={{ borderTop: `1px solid ${TELEGRAM_COLORS.border}` }}
+            >
               <button
                 onClick={() => setShowChannelModal(false)}
-                className="px-4 py-2 text-gray-400 hover:text-white transition-colors"
+                className="px-4 py-2 transition-colors hover:opacity-80"
+                style={{ color: TELEGRAM_COLORS.hint }}
               >
                 Cancel
               </button>
               <button
                 onClick={createChannel}
                 disabled={!newChannelName.trim()}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium
-                         hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-4 py-2 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{
+                  backgroundColor: TELEGRAM_COLORS.primary,
+                  color: TELEGRAM_COLORS.buttonText,
+                }}
               >
                 Create
               </button>
@@ -1774,6 +2180,147 @@ function ChatPageContent() {
           </div>
         </div>
       )}
+
+      {/* User Profile Sidebar */}
+      <UserProfileSidebar
+        isOpen={showUserProfile && selectedProfileUser !== null}
+        onClose={() => {
+          setShowUserProfile(false);
+          setSelectedProfileUser(null);
+        }}
+        user={selectedProfileUser ? {
+          id: selectedProfileUser.id,
+          name: selectedProfileUser.name,
+          image: selectedProfileUser.image,
+          email: selectedProfileUser.email || "",
+          bio: selectedProfileUser.bio,
+          lastSeen: selectedProfileUser.lastSeen,
+        } : null}
+        currentUserId={session?.user?.id || ""}
+        onMessage={() => {
+          if (selectedProfileUser) {
+            setShowUserProfile(false);
+            setSelectedProfileUser(null);
+            setViewMode("dms");
+            setSelectedDM(selectedProfileUser.id);
+          }
+        }}
+      />
+
+      {/* Admin Panel */}
+      <AdminPanel
+        isOpen={showAdminPanel && isAdmin}
+        onClose={() => setShowAdminPanel(false)}
+        channels={channels}
+        onCreateChannel={async (data) => {
+          const res = await fetch("/api/chat/channels", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(data),
+          });
+          const result = await res.json();
+          if (result.success) {
+            setChannels((prev) => [...prev, { ...result.data, unreadCount: 0, isMember: true, role: "admin", muted: false }]);
+          }
+        }}
+        onDeleteChannel={async (channelId) => {
+          const res = await fetch(`/api/chat/channels?channelId=${channelId}`, {
+            method: "DELETE",
+          });
+          const result = await res.json();
+          if (result.success) {
+            setChannels((prev) => prev.filter((c) => c.id !== channelId));
+            if (selectedChannelId === channelId) {
+              setSelectedChannelId(null);
+            }
+          }
+        }}
+        onEditChannel={async (channelId, data) => {
+          const res = await fetch("/api/chat/channels", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ channelId, ...data }),
+          });
+          const result = await res.json();
+          if (result.success) {
+            setChannels((prev) => prev.map((c) => c.id === channelId ? { ...c, ...data } : c));
+          }
+        }}
+      />
+
+      {/* Friend Requests Modal */}
+      {showFriendRequests && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
+          <div
+            className="w-full max-w-md max-h-[80vh] overflow-y-auto rounded-lg"
+            style={{ backgroundColor: TELEGRAM_COLORS.secondaryBg }}
+          >
+            <div
+              className="p-4 flex items-center justify-between"
+              style={{ borderBottom: `1px solid ${TELEGRAM_COLORS.border}` }}
+            >
+              <h2 className="font-semibold" style={{ color: TELEGRAM_COLORS.text }}>Friend Requests</h2>
+              <button
+                onClick={() => setShowFriendRequests(false)}
+                style={{ color: TELEGRAM_COLORS.hint }}
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <FriendRequestsList
+              requests={[]}
+              onAccept={async (requestId) => {
+                await fetch("/api/chat/friends", {
+                  method: "PATCH",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ requestId, action: "accept" }),
+                });
+                fetchConversations();
+              }}
+              onDecline={async (requestId) => {
+                await fetch("/api/chat/friends", {
+                  method: "PATCH",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ requestId, action: "decline" }),
+                });
+              }}
+              onBlock={async (userId) => {
+                await fetch("/api/chat/friends", {
+                  method: "PATCH",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ requestId: userId, action: "block" }),
+                });
+              }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Send Friend Request Modal */}
+      <SendRequestModal
+        isOpen={showSendRequestModal}
+        onClose={() => {
+          setShowSendRequestModal(false);
+          setSendRequestUserId(null);
+        }}
+        targetUser={sendRequestUserId ? {
+          id: sendRequestUserId,
+          name: null,
+          email: "",
+          image: null,
+        } : null}
+        onSend={async (userId, message) => {
+          await fetch("/api/chat/friends", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ receiverId: userId, message }),
+          });
+          setShowSendRequestModal(false);
+          setSendRequestUserId(null);
+        }}
+      />
     </main>
   );
 }

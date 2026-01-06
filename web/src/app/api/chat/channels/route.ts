@@ -142,3 +142,145 @@ export async function POST(request: NextRequest) {
     );
   }
 }
+
+// PATCH /api/chat/channels - Edit channel (admin only)
+export async function PATCH(request: NextRequest) {
+  const session = await auth();
+
+  if (!session?.user?.id) {
+    return NextResponse.json(
+      { success: false, error: "Unauthorized" },
+      { status: 401 }
+    );
+  }
+
+  try {
+    const body = await request.json();
+    const { channelId, name, description, icon } = body;
+
+    if (!channelId) {
+      return NextResponse.json(
+        { success: false, error: "Channel ID is required" },
+        { status: 400 }
+      );
+    }
+
+    // Check if user is site admin or channel admin
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { role: true },
+    });
+
+    const isSiteAdmin = user?.role === "admin";
+
+    if (!isSiteAdmin) {
+      // Check if channel admin
+      const membership = await prisma.chatChannelMember.findUnique({
+        where: {
+          channelId_userId: {
+            channelId,
+            userId: session.user.id,
+          },
+        },
+      });
+
+      if (membership?.role !== "admin") {
+        return NextResponse.json(
+          { success: false, error: "Admin access required" },
+          { status: 403 }
+        );
+      }
+    }
+
+    const channel = await prisma.chatChannel.update({
+      where: { id: channelId },
+      data: {
+        ...(name && { name: name.trim() }),
+        ...(description !== undefined && { description: description?.trim() || null }),
+        ...(icon && { icon }),
+      },
+      include: {
+        _count: {
+          select: { messages: true, members: true },
+        },
+      },
+    });
+
+    return NextResponse.json({
+      success: true,
+      data: channel,
+    });
+  } catch (error) {
+    console.error("Error updating channel:", error);
+    return NextResponse.json(
+      { success: false, error: "Failed to update channel" },
+      { status: 500 }
+    );
+  }
+}
+
+// DELETE /api/chat/channels - Delete channel (site admin only)
+export async function DELETE(request: NextRequest) {
+  const session = await auth();
+
+  if (!session?.user?.id) {
+    return NextResponse.json(
+      { success: false, error: "Unauthorized" },
+      { status: 401 }
+    );
+  }
+
+  try {
+    const { searchParams } = new URL(request.url);
+    const channelId = searchParams.get("channelId");
+
+    if (!channelId) {
+      return NextResponse.json(
+        { success: false, error: "Channel ID is required" },
+        { status: 400 }
+      );
+    }
+
+    // Check if user is site admin
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { role: true },
+    });
+
+    if (user?.role !== "admin") {
+      return NextResponse.json(
+        { success: false, error: "Site admin access required" },
+        { status: 403 }
+      );
+    }
+
+    // Check if it's a default channel
+    const channel = await prisma.chatChannel.findUnique({
+      where: { id: channelId },
+      select: { isDefault: true },
+    });
+
+    if (channel?.isDefault) {
+      return NextResponse.json(
+        { success: false, error: "Cannot delete default channel" },
+        { status: 400 }
+      );
+    }
+
+    // Delete channel (cascade will delete messages, members, etc.)
+    await prisma.chatChannel.delete({
+      where: { id: channelId },
+    });
+
+    return NextResponse.json({
+      success: true,
+      message: "Channel deleted",
+    });
+  } catch (error) {
+    console.error("Error deleting channel:", error);
+    return NextResponse.json(
+      { success: false, error: "Failed to delete channel" },
+      { status: 500 }
+    );
+  }
+}
