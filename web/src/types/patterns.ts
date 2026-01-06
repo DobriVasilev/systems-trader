@@ -115,6 +115,7 @@ export interface PatternConfig {
   category: "price_action" | "support_resistance" | "order_flow" | "fvg" | "supply_demand" | "fibonacci" | "trend" | "classic" | "candlestick" | "volume" | "indicators";
   settings?: PatternSetting[];
   detectionTypes: string[];
+  status?: "ready" | "beta" | "coming_soon"; // Implementation status
 }
 
 // Comprehensive pattern configurations with settings
@@ -126,6 +127,7 @@ export const PATTERN_CONFIGS: Record<PatternType, PatternConfig> = {
     description: "Detect swing highs and swing lows",
     category: "price_action",
     detectionTypes: ["swing_high", "swing_low"],
+    status: "ready",
     settings: [
       {
         key: "detection_mode",
@@ -165,6 +167,7 @@ export const PATTERN_CONFIGS: Record<PatternType, PatternConfig> = {
     description: "Detect bullish and bearish structure breaks",
     category: "price_action",
     detectionTypes: ["bos_bullish", "bos_bearish"],
+    status: "beta",
     settings: [
       {
         key: "confirmation",
@@ -192,6 +195,7 @@ export const PATTERN_CONFIGS: Record<PatternType, PatternConfig> = {
     description: "Identify market structure shifts",
     category: "price_action",
     detectionTypes: ["msb_bullish", "msb_bearish"],
+    status: "beta",
     settings: [
       {
         key: "require_impulse",

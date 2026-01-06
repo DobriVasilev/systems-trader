@@ -342,6 +342,26 @@ export function PatternSelector({
   );
 }
 
+// Status badge component
+function StatusBadge({ status }: { status?: PatternConfig["status"] }) {
+  if (status === "ready") return null; // Don't show badge for ready patterns
+
+  if (status === "beta") {
+    return (
+      <span className="px-1.5 py-0.5 text-[10px] font-medium bg-yellow-500/20 text-yellow-400 rounded">
+        BETA
+      </span>
+    );
+  }
+
+  // Default to coming_soon for undefined status
+  return (
+    <span className="px-1.5 py-0.5 text-[10px] font-medium bg-gray-500/20 text-gray-400 rounded">
+      SOON
+    </span>
+  );
+}
+
 // Pattern option component
 function PatternOption({
   config,
@@ -355,12 +375,15 @@ function PatternOption({
   compact?: boolean;
 }) {
   const category = PATTERN_CATEGORIES[config.category as CategoryKey];
+  const isComingSoon = !config.status || config.status === "coming_soon";
 
   return (
     <button
       onClick={onSelect}
+      disabled={isComingSoon}
       className={`w-full flex items-start gap-2 px-2 py-1.5 rounded text-left
-               hover:bg-gray-800 transition-colors ${isSelected ? "bg-blue-600/20 border border-blue-500/30" : ""}`}
+               transition-colors ${isSelected ? "bg-blue-600/20 border border-blue-500/30" : ""}
+               ${isComingSoon ? "opacity-50 cursor-not-allowed" : "hover:bg-gray-800"}`}
     >
       {!compact && (
         <div
@@ -373,7 +396,8 @@ function PatternOption({
           <span className={`font-medium ${compact ? "text-xs" : "text-sm"} ${isSelected ? "text-blue-400" : ""}`}>
             {config.label}
           </span>
-          {config.settings && config.settings.length > 0 && (
+          <StatusBadge status={config.status} />
+          {config.settings && config.settings.length > 0 && !isComingSoon && (
             <svg className="w-3 h-3 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
                 strokeLinecap="round"
