@@ -72,6 +72,7 @@ export interface PatternSessionDetail {
   timeframe: Timeframe;
   patternType: PatternType;
   status: "draft" | "active" | "completed" | "archived";
+  isPublic: boolean;
   candleData: {
     candles?: ChartCandle[];
     [key: string]: unknown;

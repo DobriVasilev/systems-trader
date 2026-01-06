@@ -928,7 +928,7 @@ function ChatPageContent() {
         <div className="container mx-auto px-4 py-3 flex items-center justify-between">
           <nav className="flex items-center gap-2 text-sm">
             <Link
-              href="/"
+              href="/dashboard"
               className="font-semibold text-white hover:opacity-80 transition-opacity"
             >
               Systems Trader

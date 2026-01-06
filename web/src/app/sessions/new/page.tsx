@@ -160,11 +160,11 @@ export default function NewSessionPage() {
         <div className="container mx-auto px-4 py-3 flex items-center justify-between relative">
           <nav className="flex items-center gap-2 text-sm relative z-[101]">
             <a
-              href="/"
+              href="/dashboard"
               className="font-semibold text-white hover:opacity-80 transition-opacity cursor-pointer"
               onClick={(e) => {
                 e.preventDefault();
-                window.location.href = "/";
+                window.location.href = "/dashboard";
               }}
             >
               Systems Trader

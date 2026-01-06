@@ -13,6 +13,7 @@ import { CorrectionModal, CorrectionData } from "@/components/corrections";
 import { CommentInput, CommentThread } from "@/components/comments";
 import { OnlineUsers, CursorOverlay } from "@/components/realtime";
 import { DetectionList } from "@/components/detections/DetectionList";
+import { ShareModal } from "@/components/sharing/ShareModal";
 
 function formatDate(dateString: string): string {
   const date = new Date(dateString);
@@ -76,6 +77,10 @@ export default function SessionDetailPage({
   // Move mode state - for moving detections to new locations
   const [movingDetection, setMovingDetection] = useState<PatternDetection | null>(null);
   const [moveTargetData, setMoveTargetData] = useState<{ time: number; price: number; candleIndex: number } | null>(null);
+
+  // Share modal state
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const isOwner = authSession?.user?.id === session?.createdBy?.id;
 
   // Track markers being dragged (to hide original while dragging)
   const [draggingMarkerId, setDraggingMarkerId] = useState<string | null>(null);
@@ -542,7 +547,7 @@ export default function SessionDetailPage({
       <header className="border-b border-gray-800 bg-gray-900/50 backdrop-blur-sm sticky top-0 z-50">
         <div className="container mx-auto px-4 py-3 flex items-center justify-between relative">
           <nav className="flex items-center gap-2 text-sm">
-            <Link href="/" className="font-semibold text-white hover:opacity-80 transition-opacity">
+            <Link href="/dashboard" className="font-semibold text-white hover:opacity-80 transition-opacity">
               Systems Trader
             </Link>
             <span className="text-gray-600">/</span>
@@ -613,16 +618,7 @@ export default function SessionDetailPage({
             </div>
             <div className="ml-auto flex items-center gap-4">
               <button
-                onClick={() => {
-                  const url = window.location.href;
-                  navigator.clipboard.writeText(url).then(() => {
-                    // Show toast or feedback
-                    const btn = document.activeElement as HTMLButtonElement;
-                    const originalText = btn.innerHTML;
-                    btn.innerHTML = `<svg class="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg><span>Copied!</span>`;
-                    setTimeout(() => { btn.innerHTML = originalText; }, 2000);
-                  });
-                }}
+                onClick={() => setIsShareModalOpen(true)}
                 className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -972,6 +968,17 @@ export default function SessionDetailPage({
           />
         );
       })()}
+
+      {/* Share Modal */}
+      {session && (
+        <ShareModal
+          isOpen={isShareModalOpen}
+          onClose={() => setIsShareModalOpen(false)}
+          sessionId={id}
+          isOwner={isOwner}
+          isPublic={session.isPublic}
+        />
+      )}
     </main>
   );
 }
