@@ -87,6 +87,7 @@ export function CandlestickChart({
   const [draggingMarker, setDraggingMarker] = useState<ChartMarker | null>(null);
   const [dragPosition, setDragPosition] = useState<{ x: number; y: number } | null>(null);
   const isDraggingRef = useRef(false);
+  const justFinishedDragRef = useRef(false); // Prevent click after drag
 
   // Move mode cursor position
   const [moveModePosition, setMoveModePosition] = useState<{ x: number; y: number } | null>(null);
@@ -568,6 +569,12 @@ export function CandlestickChart({
     isDraggingRef.current = false;
     setDraggingMarker(null);
     setDragPosition(null);
+
+    // Set flag to prevent click event from firing after drag
+    justFinishedDragRef.current = true;
+    setTimeout(() => {
+      justFinishedDragRef.current = false;
+    }, 100);
   }, [draggingMarker, dragPosition, candles, onMarkerDrag]);
 
   // Handle context menu (right-click)
@@ -589,8 +596,12 @@ export function CandlestickChart({
   // Handle click events
   const handleClick = useCallback(
     (event: React.MouseEvent<HTMLDivElement>) => {
-      // Don't handle click if we were dragging
+      // Don't handle click if we were dragging or just finished dragging
       if (isDraggingRef.current) return;
+      if (justFinishedDragRef.current) {
+        console.log('[Chart] Ignoring click - just finished drag');
+        return;
+      }
 
       if (!chartRef.current || !candleSeriesRef.current) return;
 
@@ -695,6 +706,12 @@ export function CandlestickChart({
         setDraggingMarker(null);
         setDragPosition(null);
         onMarkerDragEnd?.(); // Notify parent drag ended
+
+        // Prevent click from firing after drag
+        justFinishedDragRef.current = true;
+        setTimeout(() => {
+          justFinishedDragRef.current = false;
+        }, 100);
       }
     };
 

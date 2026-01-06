@@ -40,7 +40,7 @@ export const detectionActionSchema = z.discriminatedUnion("action", [
 export const createCorrectionSchema = z.object({
   detectionId: z.string().min(1).optional().nullable(),
   correctionType: z.enum(["move", "delete", "add", "confirm"]),
-  reason: z.string().min(1).max(1000),
+  reason: z.string().max(1000).optional().default(""),
   // For move/delete corrections - original values
   originalIndex: z.number().int().min(0).optional().nullable(),
   originalTime: z.string().or(z.number()).optional().nullable(),
