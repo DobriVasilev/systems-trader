@@ -85,6 +85,17 @@ export default function SessionDetailPage({
   // Pattern reasoning modal state
   const [isPatternReasoningOpen, setIsPatternReasoningOpen] = useState(false);
 
+  // Chart navigation/highlight state
+  const [highlightMarkerId, setHighlightMarkerId] = useState<string | null>(null);
+  const [navigateToTime, setNavigateToTime] = useState<number | null>(null);
+
+  // Collapsible section states
+  const [sectionsCollapsed, setSectionsCollapsed] = useState({
+    comments: false,
+    changeLog: false,
+    detections: false,
+  });
+
   // Track markers being dragged (to hide original while dragging)
   const [draggingMarkerId, setDraggingMarkerId] = useState<string | null>(null);
   const dragApiCallInProgressRef = useRef(false);
@@ -573,16 +584,119 @@ export default function SessionDetailPage({
     }
   };
 
-  // Handle navigation to detection from comment
+  // Handle navigation to detection from comment/changelog - scroll to chart and highlight
   const handleNavigateToDetection = useCallback((detectionId: string) => {
     const detection = session?.detections.find((d) => d.id === detectionId);
     if (detection) {
-      // Open the modal in options mode to show the detection
-      setSelectedDetection(detection);
-      setCorrectionMode("options");
-      setCorrectionModalOpen(true);
+      // Navigate chart to the detection's time and highlight it
+      const candleTime = new Date(detection.candleTime).getTime() / 1000;
+      setNavigateToTime(candleTime);
+      setHighlightMarkerId(detectionId);
+
+      // Clear highlight after 2 seconds
+      setTimeout(() => {
+        setHighlightMarkerId(null);
+      }, 2000);
     }
   }, [session?.detections]);
+
+  // Clear navigation after it completes
+  const handleNavigationComplete = useCallback(() => {
+    setNavigateToTime(null);
+  }, []);
+
+  // Export algorithm feedback for debugging/improvement
+  const handleExportFeedback = useCallback(() => {
+    if (!session) return;
+
+    // Get context candles around each correction
+    const getCandleContext = (candleIndex: number, windowSize = 10) => {
+      const start = Math.max(0, candleIndex - windowSize);
+      const end = Math.min(candles.length, candleIndex + windowSize + 1);
+      return candles.slice(start, end).map((c, i) => ({
+        index: start + i,
+        ...c,
+        isTarget: start + i === candleIndex,
+      }));
+    };
+
+    const exportData = {
+      exportedAt: new Date().toISOString(),
+      session: {
+        id: session.id,
+        name: session.name,
+        symbol: session.symbol,
+        timeframe: session.timeframe,
+        patternType: session.patternType,
+        patternSettings: session.patternSettings,
+        createdAt: session.createdAt,
+        candleCount: candles.length,
+        dateRange: candles.length > 0 ? {
+          start: new Date(candles[0].time * 1000).toISOString(),
+          end: new Date(candles[candles.length - 1].time * 1000).toISOString(),
+        } : null,
+      },
+      summary: {
+        totalDetections: session.detections.length,
+        totalCorrections: session.corrections.length,
+        correctionsByType: session.corrections.reduce((acc, c) => {
+          acc[c.correctionType] = (acc[c.correctionType] || 0) + 1;
+          return acc;
+        }, {} as Record<string, number>),
+      },
+      corrections: session.corrections.map((correction) => {
+        const detection = correction.detectionId
+          ? session.detections.find((d) => d.id === correction.detectionId)
+          : null;
+
+        return {
+          id: correction.id,
+          type: correction.correctionType,
+          reason: correction.reason,
+          createdAt: correction.createdAt,
+          user: correction.user.name,
+          original: detection ? {
+            id: detection.id,
+            candleIndex: detection.candleIndex,
+            price: detection.price,
+            type: detection.detectionType,
+            structure: detection.structure,
+            reasoning: (detection.metadata as { fullReasoning?: string })?.fullReasoning || null,
+          } : null,
+          corrected: {
+            index: correction.correctedIndex,
+            price: correction.correctedPrice,
+            type: correction.correctedType,
+          },
+          // Include surrounding candles for context
+          candleContext: detection ? getCandleContext(detection.candleIndex) : null,
+        };
+      }),
+      // Include all detections for reference
+      detections: session.detections.map((d) => ({
+        id: d.id,
+        candleIndex: d.candleIndex,
+        candleTime: d.candleTime,
+        price: d.price,
+        type: d.detectionType,
+        structure: d.structure,
+        status: d.status,
+        confidence: d.confidence,
+        reasoning: (d.metadata as { fullReasoning?: string })?.fullReasoning || null,
+      })),
+      // Full candle data for replay
+      candles: candles,
+    };
+
+    // Download as JSON
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `feedback-${session.symbol}-${session.timeframe}-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [session, candles]);
 
   if (sessionError) {
     return (
@@ -687,6 +801,18 @@ export default function SessionDetailPage({
                 </svg>
                 Algorithm
               </button>
+              {session.corrections.length > 0 && (
+                <button
+                  onClick={handleExportFeedback}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-purple-900/50 hover:bg-purple-800/50 text-purple-300 rounded-lg transition-colors"
+                  title="Export corrections feedback as JSON for algorithm improvement"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                  </svg>
+                  Export Feedback
+                </button>
+              )}
               <button
                 onClick={() => setIsShareModalOpen(true)}
                 className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors"
@@ -748,6 +874,8 @@ export default function SessionDetailPage({
                 candles={candles}
                 markers={markers}
                 hiddenMarkerIds={hiddenMarkerIds}
+                highlightMarkerId={highlightMarkerId}
+                navigateToTime={navigateToTime}
                 isInMoveMode={!!movingDetection}
                 movingMarkerColor={movingDetection?.detectionType.includes("high") ? "#26a69a" : "#ef5350"}
                 magnetMode={magnetMode}
@@ -758,6 +886,7 @@ export default function SessionDetailPage({
                 onMarkerDrag={handleMarkerDrag}
                 onMarkerDragEnd={handleMarkerDragEnd}
                 onMarkerContextMenu={handleMarkerContextMenu}
+                onNavigationComplete={handleNavigationComplete}
                 sessionId={id}
                 height={600}
               />
@@ -797,127 +926,195 @@ export default function SessionDetailPage({
           </div>
 
           <div className="flex-1 overflow-y-auto">
-            {/* Comments - Now at top */}
-            <div className="p-4 border-b border-gray-800">
-              <h3 className="text-sm font-medium text-gray-400 mb-3">
-                Comments {session?.comments?.length ? `(${session.comments.length})` : ""}
-              </h3>
-
-              {/* Comment Input */}
-              <div className="mb-4">
-                <CommentInput
-                  onSubmit={(content) => handleAddComment(content)}
-                  placeholder="Add a comment about this session..."
-                />
-              </div>
-
-              {/* Comments List */}
-              {session?.comments && session.comments.length > 0 ? (
-                <div className="space-y-4">
-                  {session.comments.map((comment) => (
-                    <CommentThread
-                      key={comment.id}
-                      comment={comment}
-                      onReply={handleReplyComment}
-                      onResolve={handleResolveComment}
-                      onDelete={handleDeleteComment}
-                      onNavigateToDetection={handleNavigateToDetection}
-                      currentUserId={authSession?.user?.id}
+            {/* Comments - Collapsible */}
+            <div className="border-b border-gray-800">
+              <button
+                onClick={() => setSectionsCollapsed(s => ({ ...s, comments: !s.comments }))}
+                className="w-full p-4 flex items-center justify-between hover:bg-gray-800/30 transition-colors"
+              >
+                <h3 className="text-sm font-medium text-gray-400">
+                  Comments {session?.comments?.length ? `(${session.comments.length})` : ""}
+                </h3>
+                <svg
+                  className={`w-4 h-4 text-gray-500 transition-transform ${sectionsCollapsed.comments ? '' : 'rotate-180'}`}
+                  fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+              {!sectionsCollapsed.comments && (
+                <div className="px-4 pb-4">
+                  {/* Comment Input */}
+                  <div className="mb-4">
+                    <CommentInput
+                      onSubmit={(content) => handleAddComment(content)}
+                      placeholder="Add a comment about this session..."
                     />
-                  ))}
-                </div>
-              ) : (
-                <p className="text-sm text-gray-500 text-center py-2">
-                  No comments yet
-                </p>
-              )}
-            </div>
+                  </div>
 
-            {/* Change Log / Corrections - shown above detections */}
-            <div className="p-4 border-b border-gray-800">
-              <h3 className="text-sm font-medium text-gray-400 mb-3">
-                Change Log {session?.corrections?.length ? `(${session.corrections.length})` : ""}
-              </h3>
-              {session?.corrections && session.corrections.length > 0 ? (
-                <div className="space-y-3 max-h-64 overflow-y-auto">
-                  {session.corrections.map((correction) => (
-                    <div key={correction.id} className="text-sm bg-gray-800/50 rounded-lg p-2">
-                      <div className="flex items-center gap-2 mb-1">
-                        {correction.user.image ? (
-                          <img
-                            src={correction.user.image}
-                            alt={correction.user.name || ""}
-                            className="w-4 h-4 rounded-full"
-                          />
-                        ) : (
-                          <div className="w-4 h-4 rounded-full bg-gray-700" />
-                        )}
-                        <span className="text-gray-300">{correction.user.name}</span>
-                        <span className="text-gray-600 text-xs">
-                          {formatDate(correction.createdAt)}
-                        </span>
-                        {correction.detectionId && (
-                          <button
-                            onClick={() => handleNavigateToDetection(correction.detectionId!)}
-                            className="text-xs px-1.5 py-0.5 bg-blue-900/50 text-blue-300 rounded hover:bg-blue-800/50 transition-colors flex items-center gap-1 ml-auto"
-                            title="Go to detection on chart"
-                          >
-                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                            </svg>
-                            Go to
-                          </button>
-                        )}
-                      </div>
-                      <div className="ml-6">
-                        <span
-                          className={`px-1.5 py-0.5 text-xs rounded ${
-                            {
-                              move: "bg-yellow-900 text-yellow-300",
-                              delete: "bg-red-900 text-red-300",
-                              add: "bg-green-900 text-green-300",
-                              modify: "bg-blue-900 text-blue-300",
-                              confirm: "bg-green-900 text-green-300",
-                              unconfirm: "bg-orange-900 text-orange-300",
-                            }[correction.correctionType] || "bg-gray-800 text-gray-300"
-                          }`}
-                        >
-                          {correction.correctionType}
-                        </span>
-                        {correction.reason && (
-                          <p className="text-gray-400 mt-1">{correction.reason}</p>
-                        )}
-                        <button
-                          onClick={() => navigator.clipboard.writeText(correction.id)}
-                          className="text-xs text-gray-600 hover:text-gray-400 mt-1 flex items-center gap-1"
-                          title="Copy correction ID"
-                        >
-                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                          </svg>
-                          {correction.id.slice(0, 8)}...
-                        </button>
-                      </div>
+                  {/* Comments List */}
+                  {session?.comments && session.comments.length > 0 ? (
+                    <div className="space-y-4">
+                      {session.comments.map((comment) => (
+                        <CommentThread
+                          key={comment.id}
+                          comment={comment}
+                          onReply={handleReplyComment}
+                          onResolve={handleResolveComment}
+                          onDelete={handleDeleteComment}
+                          onNavigateToDetection={handleNavigateToDetection}
+                          currentUserId={authSession?.user?.id}
+                        />
+                      ))}
                     </div>
-                  ))}
+                  ) : (
+                    <p className="text-sm text-gray-500 text-center py-2">
+                      No comments yet
+                    </p>
+                  )}
                 </div>
-              ) : (
-                <p className="text-sm text-gray-500 text-center py-2">
-                  No changes logged yet
-                </p>
               )}
             </div>
 
-            {/* Detections List with Search/Filter */}
+            {/* Change Log / Corrections - Collapsible */}
+            <div className="border-b border-gray-800">
+              <button
+                onClick={() => setSectionsCollapsed(s => ({ ...s, changeLog: !s.changeLog }))}
+                className="w-full p-4 flex items-center justify-between hover:bg-gray-800/30 transition-colors"
+              >
+                <h3 className="text-sm font-medium text-gray-400">
+                  Change Log {session?.corrections?.length ? `(${session.corrections.length})` : ""}
+                </h3>
+                <svg
+                  className={`w-4 h-4 text-gray-500 transition-transform ${sectionsCollapsed.changeLog ? '' : 'rotate-180'}`}
+                  fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+              {!sectionsCollapsed.changeLog && (
+                <div className="px-4 pb-4">
+                  {session?.corrections && session.corrections.length > 0 ? (
+                    <div className="space-y-3 max-h-64 overflow-y-auto">
+                      {session.corrections.map((correction) => {
+                        const detection = correction.detectionId
+                          ? session.detections.find(d => d.id === correction.detectionId)
+                          : null;
+                        return (
+                          <div
+                            key={correction.id}
+                            className="text-sm bg-gray-800/50 rounded-lg p-2 hover:bg-gray-700/50 cursor-pointer transition-colors"
+                            onClick={() => {
+                              if (detection) {
+                                setSelectedDetection(detection);
+                                setCorrectionMode("options");
+                                setCorrectionModalOpen(true);
+                              }
+                            }}
+                          >
+                            <div className="flex items-center gap-2 mb-1">
+                              {correction.user.image ? (
+                                <img
+                                  src={correction.user.image}
+                                  alt={correction.user.name || ""}
+                                  className="w-4 h-4 rounded-full"
+                                />
+                              ) : (
+                                <div className="w-4 h-4 rounded-full bg-gray-700" />
+                              )}
+                              <span className="text-gray-300">{correction.user.name}</span>
+                              <span className="text-gray-600 text-xs">
+                                {formatDate(correction.createdAt)}
+                              </span>
+                              {correction.detectionId && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleNavigateToDetection(correction.detectionId!);
+                                  }}
+                                  className="text-xs px-1.5 py-0.5 bg-blue-900/50 text-blue-300 rounded hover:bg-blue-800/50 transition-colors flex items-center gap-1 ml-auto"
+                                  title="Go to detection on chart"
+                                >
+                                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                                  </svg>
+                                  Go to
+                                </button>
+                              )}
+                            </div>
+                            <div className="ml-6">
+                              <span
+                                className={`px-1.5 py-0.5 text-xs rounded ${
+                                  {
+                                    move: "bg-yellow-900 text-yellow-300",
+                                    delete: "bg-red-900 text-red-300",
+                                    add: "bg-green-900 text-green-300",
+                                    modify: "bg-blue-900 text-blue-300",
+                                    confirm: "bg-green-900 text-green-300",
+                                    unconfirm: "bg-orange-900 text-orange-300",
+                                  }[correction.correctionType] || "bg-gray-800 text-gray-300"
+                                }`}
+                              >
+                                {correction.correctionType}
+                              </span>
+                              {correction.reason && (
+                                <p className="text-gray-400 mt-1">{correction.reason}</p>
+                              )}
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  navigator.clipboard.writeText(correction.id);
+                                }}
+                                className="text-xs text-gray-600 hover:text-gray-400 mt-1 flex items-center gap-1"
+                                title="Copy correction ID"
+                              >
+                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                </svg>
+                                {correction.id.slice(0, 8)}...
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-500 text-center py-2">
+                      No changes logged yet
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Detections List - Collapsible */}
             {session?.detections && session.detections.length > 0 && (
-              <div className="flex-1 min-h-0 border-b border-gray-800">
-                <DetectionList
-                  detections={session.detections}
-                  onConfirm={(d) => openCorrectionModal("confirm", d)}
-                  onModify={(d) => openCorrectionModal("move", d)}
-                  onDelete={(d) => openCorrectionModal("delete", d)}
-                />
+              <div className="border-b border-gray-800">
+                <button
+                  onClick={() => setSectionsCollapsed(s => ({ ...s, detections: !s.detections }))}
+                  className="w-full p-4 flex items-center justify-between hover:bg-gray-800/30 transition-colors"
+                >
+                  <h3 className="text-sm font-medium text-gray-400">
+                    Detections ({session.detections.length})
+                  </h3>
+                  <svg
+                    className={`w-4 h-4 text-gray-500 transition-transform ${sectionsCollapsed.detections ? '' : 'rotate-180'}`}
+                    fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+                {!sectionsCollapsed.detections && (
+                  <div className="flex-1 min-h-0">
+                    <DetectionList
+                      detections={session.detections}
+                      onConfirm={(d) => openCorrectionModal("confirm", d)}
+                      onModify={(d) => openCorrectionModal("move", d)}
+                      onDelete={(d) => openCorrectionModal("delete", d)}
+                    />
+                  </div>
+                )}
               </div>
             )}
 

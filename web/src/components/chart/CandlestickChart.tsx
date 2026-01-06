@@ -34,6 +34,8 @@ interface CandlestickChartProps {
   candles: ChartCandle[];
   markers?: ChartMarker[];
   hiddenMarkerIds?: string[]; // Markers to hide (e.g., during move operation)
+  highlightMarkerId?: string | null; // Marker to highlight temporarily
+  navigateToTime?: number | null; // Unix timestamp to navigate to
   isInMoveMode?: boolean; // Show move mode cursor indicator
   movingMarkerColor?: string; // Color of the marker being moved
   magnetMode?: boolean; // Snap to candle levels (same as holding Cmd/Ctrl)
@@ -44,6 +46,7 @@ interface CandlestickChartProps {
   onMarkerDrag?: (marker: ChartMarker, newTime: number, newPrice: number) => void;
   onMarkerDragEnd?: () => void; // Called when drag ends (successful or cancelled)
   onMarkerContextMenu?: (marker: ChartMarker, x: number, y: number) => void;
+  onNavigationComplete?: () => void; // Called after navigateToTime completes
   sessionId?: string; // For saving/restoring chart position
   height?: number;
   className?: string;
@@ -53,6 +56,8 @@ export function CandlestickChart({
   candles,
   markers = [],
   hiddenMarkerIds = [],
+  highlightMarkerId = null,
+  navigateToTime = null,
   isInMoveMode = false,
   movingMarkerColor = "#ef5350",
   magnetMode = false,
@@ -63,6 +68,7 @@ export function CandlestickChart({
   onMarkerDrag,
   onMarkerDragEnd,
   onMarkerContextMenu,
+  onNavigationComplete,
   sessionId,
   height = 500,
   className = "",
@@ -301,15 +307,40 @@ export function CandlestickChart({
     const seriesMarkers: SeriesMarker<Time>[] = visibleMarkers.map((m) => ({
       time: m.time as Time,
       position: m.position,
-      color: m.color,
+      color: highlightMarkerId === m.id ? "#ffffff" : m.color, // White when highlighted
       shape: m.shape,
       text: m.text,
-      size: m.size || 1,
+      size: highlightMarkerId === m.id ? 3 : (m.size || 1), // Larger when highlighted
     }));
 
     seriesMarkers.sort((a, b) => (a.time as number) - (b.time as number));
     candleSeriesRef.current.setMarkers(seriesMarkers);
-  }, [markers, hiddenMarkerIds]);
+  }, [markers, hiddenMarkerIds, highlightMarkerId]);
+
+  // Handle navigation to specific time
+  useEffect(() => {
+    if (!chartRef.current || navigateToTime === null) return;
+
+    const timeScale = chartRef.current.timeScale();
+
+    // Calculate visible range to center on the target time
+    const currentRange = timeScale.getVisibleRange();
+    if (currentRange) {
+      const rangeWidth = (currentRange.to as number) - (currentRange.from as number);
+      const halfRange = rangeWidth / 2;
+
+      timeScale.setVisibleRange({
+        from: (navigateToTime - halfRange) as Time,
+        to: (navigateToTime + halfRange) as Time,
+      });
+    } else {
+      // Fallback: fit content then scroll
+      timeScale.scrollToPosition(0, false);
+    }
+
+    // Call completion callback
+    onNavigationComplete?.();
+  }, [navigateToTime, onNavigationComplete]);
 
   // Calculate marker screen positions for price lines
   const updateMarkerLinePositions = useCallback(() => {
@@ -907,7 +938,7 @@ export function CandlestickChart({
         </>
       )}
 
-      {/* Drag indicator */}
+      {/* Drag indicator - uses marker shape (square for close, circle for wicks) */}
       {draggingMarker && dragPosition && (
         <div
           className="absolute pointer-events-none z-50"
@@ -917,7 +948,7 @@ export function CandlestickChart({
             width: 24,
             height: 24,
             backgroundColor: draggingMarker.color,
-            borderRadius: "50%",
+            borderRadius: draggingMarker.shape === "square" ? "4px" : "50%",
             opacity: 0.9,
             border: "2px solid white",
             boxShadow: `0 0 15px ${draggingMarker.color}`,
@@ -925,7 +956,7 @@ export function CandlestickChart({
         />
       )}
 
-      {/* Move mode cursor indicator */}
+      {/* Move mode cursor indicator - get shape from markers being moved */}
       {isInMoveMode && moveModePosition && (
         <div
           className="absolute pointer-events-none z-50"
@@ -935,7 +966,8 @@ export function CandlestickChart({
             width: 20,
             height: 20,
             backgroundColor: movingMarkerColor,
-            borderRadius: "50%",
+            // Use square for close detections (check if any marker being hidden is square)
+            borderRadius: markers.find(m => hiddenMarkerIds.includes(m.id))?.shape === "square" ? "4px" : "50%",
             opacity: 0.7,
             border: "2px solid white",
             boxShadow: `0 0 10px ${movingMarkerColor}`,
