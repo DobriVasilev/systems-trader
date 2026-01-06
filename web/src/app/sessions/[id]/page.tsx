@@ -211,11 +211,21 @@ export default function SessionDetailPage({
   const [autoDetectionType, setAutoDetectionType] = useState<string | null>(null);
 
   const handleCandleClick = (candle: ChartCandle, index: number) => {
+    // Use snapped price if available (from click detection), otherwise fall back to close
+    const snappedPrice = (candle as { _snappedPrice?: number })._snappedPrice ?? candle.close;
+
+    // If in move mode, handle as chart click to place the moving detection
+    if (movingDetection) {
+      setMoveTargetData({ time: candle.time, price: snappedPrice, candleIndex: index });
+      setSelectedDetection(movingDetection);
+      setCorrectionMode("move");
+      setCorrectionModalOpen(true);
+      return;
+    }
+
     // Only trigger if a drawing tool is selected (not "select" mode)
     if (activeTool === "select") return;
 
-    // Use snapped price if available (from click detection), otherwise fall back to close
-    const snappedPrice = (candle as { _snappedPrice?: number })._snappedPrice ?? candle.close;
     setAddData({ time: candle.time, price: snappedPrice, candleIndex: index });
     setAutoDetectionType(activeTool); // Pass the tool type to the modal
     setCorrectionMode("add");
@@ -607,6 +617,8 @@ export default function SessionDetailPage({
                 candles={candles}
                 markers={markers}
                 hiddenMarkerIds={hiddenMarkerIds}
+                isInMoveMode={!!movingDetection}
+                movingMarkerColor={movingDetection?.detectionType.includes("high") ? "#26a69a" : "#ef5350"}
                 onCandleClick={handleCandleClick}
                 onMarkerClick={handleMarkerClick}
                 onChartClick={handleChartClick}

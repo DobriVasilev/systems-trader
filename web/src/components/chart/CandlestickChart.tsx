@@ -34,6 +34,8 @@ interface CandlestickChartProps {
   candles: ChartCandle[];
   markers?: ChartMarker[];
   hiddenMarkerIds?: string[]; // Markers to hide (e.g., during move operation)
+  isInMoveMode?: boolean; // Show move mode cursor indicator
+  movingMarkerColor?: string; // Color of the marker being moved
   onCandleClick?: (candle: ChartCandle, index: number) => void;
   onMarkerClick?: (marker: ChartMarker) => void;
   onChartClick?: (time: number, price: number) => void;
@@ -50,6 +52,8 @@ export function CandlestickChart({
   candles,
   markers = [],
   hiddenMarkerIds = [],
+  isInMoveMode = false,
+  movingMarkerColor = "#ef5350",
   onCandleClick,
   onMarkerClick,
   onChartClick,
@@ -83,6 +87,9 @@ export function CandlestickChart({
   const [draggingMarker, setDraggingMarker] = useState<ChartMarker | null>(null);
   const [dragPosition, setDragPosition] = useState<{ x: number; y: number } | null>(null);
   const isDraggingRef = useRef(false);
+
+  // Move mode cursor position
+  const [moveModePosition, setMoveModePosition] = useState<{ x: number; y: number } | null>(null);
 
   // Save chart position to localStorage
   const saveChartPosition = useCallback(() => {
@@ -200,11 +207,19 @@ export function CandlestickChart({
       saveChartPosition();
     };
 
+    // Save position whenever time scale changes (scroll/zoom)
+    const handleTimeScaleChange = () => {
+      saveChartPosition();
+    };
+
+    chart.timeScale().subscribeVisibleTimeRangeChange(handleTimeScaleChange);
+
     window.addEventListener("resize", handleResize);
     window.addEventListener("beforeunload", handleBeforeUnload);
     handleResize();
 
     return () => {
+      chart.timeScale().unsubscribeVisibleTimeRangeChange(handleTimeScaleChange);
       window.removeEventListener("resize", handleResize);
       window.removeEventListener("beforeunload", handleBeforeUnload);
       saveChartPosition(); // Save on unmount too
@@ -357,9 +372,23 @@ export function CandlestickChart({
     };
   }, [candles]); // Only depend on candles, not isModifierHeld
 
+  // Check if position is within chart data area (not on scales)
+  const isInChartArea = useCallback((x: number, y: number): boolean => {
+    if (!containerRef.current) return false;
+    const rect = containerRef.current.getBoundingClientRect();
+    const priceScaleWidth = 70; // Right side price scale
+    const timeScaleHeight = 30; // Bottom time scale
+
+    // Exclude right price scale and bottom time scale
+    return x < rect.width - priceScaleWidth && y < rect.height - timeScaleHeight;
+  }, []);
+
   // Find marker at position
   const findMarkerAtPosition = useCallback((x: number, y: number): ChartMarker | null => {
     if (!chartRef.current || !candleSeriesRef.current) return null;
+
+    // Don't detect markers in scale areas
+    if (!isInChartArea(x, y)) return null;
 
     const timeScale = chartRef.current.timeScale();
 
@@ -391,7 +420,7 @@ export function CandlestickChart({
     }
 
     return null;
-  }, [candles, markers]);
+  }, [candles, markers, isInChartArea]);
 
   // Handle mouse down - for drag initiation
   const handleMouseDown = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
@@ -426,15 +455,25 @@ export function CandlestickChart({
 
   // Handle mouse move
   const handleMouseMove = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
-    if (!isDraggingRef.current || !draggingMarker || !containerRef.current) return;
+    if (!containerRef.current) return;
 
-    event.preventDefault();
     const rect = containerRef.current.getBoundingClientRect();
     const x = event.clientX - rect.left;
     const y = event.clientY - rect.top;
 
-    setDragPosition({ x, y });
-  }, [draggingMarker]);
+    // Update move mode cursor position
+    if (isInMoveMode && isInChartArea(x, y)) {
+      setMoveModePosition({ x, y });
+    } else {
+      setMoveModePosition(null);
+    }
+
+    // Handle drag
+    if (isDraggingRef.current && draggingMarker) {
+      event.preventDefault();
+      setDragPosition({ x, y });
+    }
+  }, [draggingMarker, isInMoveMode, isInChartArea]);
 
   // Handle mouse up - complete drag
   const handleMouseUp = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
@@ -640,16 +679,22 @@ export function CandlestickChart({
     return () => window.removeEventListener("mouseup", handleGlobalMouseUp);
   }, [onMarkerDragEnd]);
 
+  // Handle mouse leave
+  const handleMouseLeave = useCallback(() => {
+    setMoveModePosition(null);
+  }, []);
+
   return (
     <div className="relative">
       <div
         ref={containerRef}
-        className={`w-full ${className} ${draggingMarker ? "cursor-grabbing" : ""}`}
+        className={`w-full ${className} ${draggingMarker ? "cursor-grabbing" : ""} ${isInMoveMode ? "cursor-crosshair" : ""}`}
         style={{ height }}
         onClick={handleClick}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseLeave}
         onContextMenu={handleContextMenu}
       />
 
@@ -703,6 +748,24 @@ export function CandlestickChart({
             opacity: 0.9,
             border: "2px solid white",
             boxShadow: `0 0 15px ${draggingMarker.color}`,
+          }}
+        />
+      )}
+
+      {/* Move mode cursor indicator */}
+      {isInMoveMode && moveModePosition && (
+        <div
+          className="absolute pointer-events-none z-50"
+          style={{
+            left: moveModePosition.x - 10,
+            top: moveModePosition.y - 10,
+            width: 20,
+            height: 20,
+            backgroundColor: movingMarkerColor,
+            borderRadius: "50%",
+            opacity: 0.7,
+            border: "2px solid white",
+            boxShadow: `0 0 10px ${movingMarkerColor}`,
           }}
         />
       )}
