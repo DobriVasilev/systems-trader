@@ -6,6 +6,7 @@ export const createSessionSchema = z.object({
   symbol: z.string().min(1).max(20),
   timeframe: z.enum(["1m", "5m", "15m", "30m", "1h", "4h", "1d", "1w"]),
   patternType: z.string().min(1).max(50),
+  patternSettings: z.record(z.string(), z.unknown()).optional(), // Pattern-specific settings
   candleData: z.record(z.string(), z.unknown()).optional(),
   description: z.string().max(1000).optional(),
 });
@@ -39,7 +40,7 @@ export const detectionActionSchema = z.discriminatedUnion("action", [
 // Correction schemas - matches actual API usage
 export const createCorrectionSchema = z.object({
   detectionId: z.string().min(1).optional().nullable(),
-  correctionType: z.enum(["move", "delete", "add", "confirm"]),
+  correctionType: z.enum(["move", "delete", "add", "confirm", "unconfirm"]),
   reason: z.string().max(1000).optional().default(""),
   // For move/delete corrections - original values
   originalIndex: z.number().int().min(0).optional().nullable(),

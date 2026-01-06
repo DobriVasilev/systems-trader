@@ -87,7 +87,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { name, symbol, timeframe, patternType, candleData } = validation.data;
+    const { name, symbol, timeframe, patternType, patternSettings, candleData } = validation.data;
 
     const patternSession = await prisma.patternSession.create({
       data: {
@@ -96,6 +96,7 @@ export async function POST(request: NextRequest) {
         symbol,
         timeframe,
         patternType,
+        patternSettings: patternSettings ? JSON.parse(JSON.stringify(patternSettings)) : null,
         candleData: candleData ? JSON.parse(JSON.stringify(candleData)) : {},
         createdById: session.user.id,
       },

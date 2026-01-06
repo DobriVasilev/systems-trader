@@ -106,15 +106,18 @@ export async function POST(
         );
       }
 
-      // Fetch user preferences for detection settings
+      // Get detection settings from session's patternSettings (fallback to user prefs, then default)
+      const sessionSettings = patternSession.patternSettings as { detection_mode?: "wicks" | "closes" } | null;
       const user = await prisma.user.findUnique({
         where: { id: session.user.id },
         select: { preferences: true },
       });
-
       const userPrefs = user?.preferences as { swingDetectionMode?: "wicks" | "closes" } | null;
+
+      // Priority: session settings > user preferences > default
+      const detectionMode = sessionSettings?.detection_mode || userPrefs?.swingDetectionMode || "wicks";
       const detectionOptions: DetectionOptions = {
-        mode: userPrefs?.swingDetectionMode || "wicks",
+        mode: detectionMode,
       };
 
       // Clear existing detections for this session
@@ -147,7 +150,7 @@ export async function POST(
           detections = detectSwings(candles, detectionOptions); // Default to swings
       }
 
-      // Store detections in database
+      // Store detections in database with detection mode in metadata
       const createdDetections = await prisma.patternDetection.createMany({
         data: detections.map((d) => ({
           id: generateUlid(),
@@ -158,7 +161,10 @@ export async function POST(
           detectionType: d.detectionType,
           structure: d.structure || null,
           confidence: d.confidence || null,
-          metadata: d.metadata ? JSON.parse(JSON.stringify(d.metadata)) : undefined,
+          metadata: JSON.parse(JSON.stringify({
+            ...d.metadata,
+            detection_mode: detectionMode, // Store whether this was a wick or close detection
+          })),
           status: "pending",
         })),
       });

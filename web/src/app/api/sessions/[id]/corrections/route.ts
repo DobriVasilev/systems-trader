@@ -171,6 +171,12 @@ export async function POST(
         where: { id: detectionId },
         data: { status: "confirmed" },
       });
+    } else if (correctionType === "unconfirm" && detectionId) {
+      // Revert confirmed status back to pending
+      await prisma.patternDetection.update({
+        where: { id: detectionId },
+        data: { status: "pending" },
+      });
     } else if (correctionType === "move" && detectionId) {
       // Mark original as moved
       await prisma.patternDetection.update({
@@ -252,14 +258,17 @@ export async function POST(
     });
 
     // Log detection status change if applicable
-    if (detectionId && ["delete", "confirm", "move"].includes(correctionType)) {
+    if (detectionId && ["delete", "confirm", "unconfirm", "move"].includes(correctionType)) {
       const newStatus =
         correctionType === "delete"
           ? "rejected"
           : correctionType === "confirm"
           ? "confirmed"
+          : correctionType === "unconfirm"
+          ? "pending"
           : "moved";
-      await logDetectionStatusChanged(id, session.user.id, detectionId, "pending", newStatus);
+      const oldStatus = correctionType === "unconfirm" ? "confirmed" : "pending";
+      await logDetectionStatusChanged(id, session.user.id, detectionId, oldStatus, newStatus);
     }
 
     return NextResponse.json({

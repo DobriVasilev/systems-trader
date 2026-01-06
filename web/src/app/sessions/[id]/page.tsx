@@ -69,7 +69,7 @@ export default function SessionDetailPage({
 
   // Correction modal state
   const [correctionModalOpen, setCorrectionModalOpen] = useState(false);
-  const [correctionMode, setCorrectionMode] = useState<"delete" | "move" | "add" | "confirm" | "options">("delete");
+  const [correctionMode, setCorrectionMode] = useState<"delete" | "move" | "add" | "confirm" | "unconfirm" | "options">("delete");
   const [selectedDetection, setSelectedDetection] = useState<PatternDetection | null>(null);
   const [addData, setAddData] = useState<{ time: number; price: number; candleIndex: number } | null>(null);
 
@@ -83,6 +83,9 @@ export default function SessionDetailPage({
 
   // Chart tool state - like TradingView drawing tools
   const [activeTool, setActiveTool] = useState<ChartTool>("select");
+
+  // Magnet mode - snaps to candle levels (high/low/open/close)
+  const [magnetMode, setMagnetMode] = useState(false);
 
   // Context menu state
   const [contextMenu, setContextMenu] = useState<{
@@ -111,6 +114,10 @@ export default function SessionDetailPage({
         case "2":
           setActiveTool("swing_low");
           setMovingDetection(null);
+          break;
+        case "m":
+        case "M":
+          setMagnetMode((prev) => !prev); // Toggle magnet mode
           break;
         case "Escape":
           setActiveTool("select");
@@ -153,19 +160,34 @@ export default function SessionDetailPage({
       let position: "aboveBar" | "belowBar" = "aboveBar";
       let shape: "circle" | "square" | "arrowUp" | "arrowDown" = "circle";
 
+      // Check if this is a "closes" detection (vs "wicks")
+      const isCloseDetection = d.metadata?.detection_mode === "closes";
+
       if (d.detectionType.includes("high") || d.detectionType.includes("bullish")) {
         color = d.detectionType.includes("bos") ? "#ff9800" : d.detectionType.includes("msb") ? "#9c27b0" : "#26a69a"; // Green for highs
         position = "aboveBar";
-        shape = d.detectionType.includes("bos") || d.detectionType.includes("msb") ? "arrowUp" : "circle";
+        // Use arrows for bos/msb, squares for close swings, circles for wick swings
+        shape = d.detectionType.includes("bos") || d.detectionType.includes("msb")
+          ? "arrowUp"
+          : isCloseDetection ? "square" : "circle";
       } else if (d.detectionType.includes("low") || d.detectionType.includes("bearish")) {
         color = d.detectionType.includes("bos") ? "#ff9800" : d.detectionType.includes("msb") ? "#9c27b0" : "#ef5350"; // Red for lows
         position = "belowBar";
-        shape = d.detectionType.includes("bos") || d.detectionType.includes("msb") ? "arrowDown" : "circle";
+        // Use arrows for bos/msb, squares for close swings, circles for wick swings
+        shape = d.detectionType.includes("bos") || d.detectionType.includes("msb")
+          ? "arrowDown"
+          : isCloseDetection ? "square" : "circle";
       }
 
       // Confirmed detections show in blue
       if (d.status === "confirmed") {
         color = "#2196f3"; // Blue for confirmed
+      }
+
+      // Build the text label - add (C) suffix for close detections
+      let text = d.detectionType.replace("swing_", "").replace("_", " ").toUpperCase();
+      if (isCloseDetection) {
+        text += " (C)";
       }
 
       return {
@@ -174,7 +196,7 @@ export default function SessionDetailPage({
         position,
         color,
         shape,
-        text: d.detectionType.replace("swing_", "").replace("_", " ").toUpperCase(),
+        text,
         size: 1,
       };
     });
@@ -387,7 +409,7 @@ export default function SessionDetailPage({
     setContextMenu({ x, y, marker });
   }, []);
 
-  const openCorrectionModal = (mode: "delete" | "move" | "add" | "confirm", detection?: PatternDetection) => {
+  const openCorrectionModal = (mode: "delete" | "move" | "add" | "confirm" | "unconfirm", detection?: PatternDetection) => {
     console.log('[Session] openCorrectionModal', { mode, detectionId: detection?.id });
 
     // Move mode: don't open modal yet - wait for user to click new position
@@ -652,6 +674,8 @@ export default function SessionDetailPage({
               <ChartToolbar
                 activeTool={activeTool}
                 onToolChange={setActiveTool}
+                magnetMode={magnetMode}
+                onMagnetModeChange={setMagnetMode}
                 disabled={isLoading}
               />
               <CandlestickChart
@@ -660,6 +684,7 @@ export default function SessionDetailPage({
                 hiddenMarkerIds={hiddenMarkerIds}
                 isInMoveMode={!!movingDetection}
                 movingMarkerColor={movingDetection?.detectionType.includes("high") ? "#26a69a" : "#ef5350"}
+                magnetMode={magnetMode}
                 onCandleClick={handleCandleClick}
                 onMarkerClick={handleMarkerClick}
                 onChartClick={handleChartClick}
@@ -685,8 +710,16 @@ export default function SessionDetailPage({
               <div className="w-3 h-3 rounded-full bg-red-500" />
               <span>Swing Low (2)</span>
             </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded bg-gray-500" />
+              <span>Close Swing</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-blue-500" />
+              <span>Confirmed</span>
+            </div>
             <div className="ml-auto text-gray-500 text-sm">
-              Click markers to edit • Press 1 or 2 to add
+              Click markers to edit • Press 1/2 to add • M for magnet
             </div>
           </div>
         </div>
@@ -869,59 +902,76 @@ export default function SessionDetailPage({
       />
 
       {/* Right-click context menu */}
-      {contextMenu && (
-        <ContextMenu
-          x={contextMenu.x}
-          y={contextMenu.y}
-          items={[
-            {
-              label: "Confirm",
-              variant: "success",
-              icon: (
-                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-              ),
-              onClick: () => {
-                const detection = session?.detections.find((d) => d.id === contextMenu.marker.id);
-                if (detection) {
-                  openCorrectionModal("confirm", detection);
-                }
+      {contextMenu && (() => {
+        const detection = session?.detections.find((d) => d.id === contextMenu.marker.id);
+        const isConfirmed = detection?.status === "confirmed";
+
+        return (
+          <ContextMenu
+            x={contextMenu.x}
+            y={contextMenu.y}
+            items={[
+              // Confirm/Unconfirm based on current status
+              isConfirmed
+                ? {
+                    label: "Unconfirm",
+                    icon: (
+                      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    ),
+                    onClick: () => {
+                      if (detection) {
+                        openCorrectionModal("unconfirm", detection);
+                      }
+                    },
+                  }
+                : {
+                    label: "Confirm",
+                    variant: "success" as const,
+                    icon: (
+                      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                    ),
+                    onClick: () => {
+                      if (detection) {
+                        openCorrectionModal("confirm", detection);
+                      }
+                    },
+                  },
+              {
+                label: "Move",
+                icon: (
+                  <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+                  </svg>
+                ),
+                onClick: () => {
+                  if (detection) {
+                    openCorrectionModal("move", detection);
+                  }
+                },
               },
-            },
-            {
-              label: "Move",
-              icon: (
-                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
-                </svg>
-              ),
-              onClick: () => {
-                const detection = session?.detections.find((d) => d.id === contextMenu.marker.id);
-                if (detection) {
-                  openCorrectionModal("move", detection);
-                }
+              {
+                label: "Delete",
+                variant: "danger" as const,
+                icon: (
+                  <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                ),
+                onClick: () => {
+                  if (detection) {
+                    openCorrectionModal("delete", detection);
+                  }
+                },
               },
-            },
-            {
-              label: "Delete",
-              variant: "danger",
-              icon: (
-                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                </svg>
-              ),
-              onClick: () => {
-                const detection = session?.detections.find((d) => d.id === contextMenu.marker.id);
-                if (detection) {
-                  openCorrectionModal("delete", detection);
-                }
-              },
-            },
-          ]}
-          onClose={() => setContextMenu(null)}
-        />
-      )}
+            ]}
+            onClose={() => setContextMenu(null)}
+          />
+        );
+      })()}
     </main>
   );
 }

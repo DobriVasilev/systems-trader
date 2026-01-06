@@ -58,10 +58,12 @@ const TOOLS: ToolConfig[] = [
 interface ChartToolbarProps {
   activeTool: ChartTool;
   onToolChange: (tool: ChartTool) => void;
+  magnetMode?: boolean;
+  onMagnetModeChange?: (enabled: boolean) => void;
   disabled?: boolean;
 }
 
-export function ChartToolbar({ activeTool, onToolChange, disabled }: ChartToolbarProps) {
+export function ChartToolbar({ activeTool, onToolChange, magnetMode = false, onMagnetModeChange, disabled }: ChartToolbarProps) {
   const activeToolConfig = TOOLS.find((t) => t.id === activeTool);
 
   return (
@@ -87,6 +89,30 @@ export function ChartToolbar({ activeTool, onToolChange, disabled }: ChartToolba
             {tool.icon}
           </button>
         ))}
+
+        {/* Divider */}
+        <div className="h-px bg-gray-700 my-1" />
+
+        {/* Magnet Mode Toggle */}
+        <button
+          onClick={() => onMagnetModeChange?.(!magnetMode)}
+          disabled={disabled}
+          title={`Magnet Mode (M) - Snap to candle levels`}
+          className={`
+            w-10 h-10 flex items-center justify-center rounded-md transition-all
+            ${magnetMode
+              ? "bg-blue-600 text-white shadow-lg"
+              : "text-gray-400 hover:text-white hover:bg-gray-800"
+            }
+            ${disabled ? "opacity-50 cursor-not-allowed" : ""}
+          `}
+        >
+          <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4h4v6a4 4 0 008 0V4h4" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 4V2M16 4V2" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 14l-2 6M18 14l2 6" />
+          </svg>
+        </button>
       </div>
 
       {/* Active tool indicator */}

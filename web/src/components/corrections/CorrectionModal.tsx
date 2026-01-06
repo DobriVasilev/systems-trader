@@ -9,7 +9,7 @@ interface CorrectionModalProps {
   onSubmit: (correction: CorrectionData) => Promise<void>;
   onStartMove?: (detection: PatternDetection) => void; // Callback to start move mode
   detection?: PatternDetection | null;
-  mode: "delete" | "move" | "add" | "confirm" | "options"; // Added "options" mode
+  mode: "delete" | "move" | "add" | "confirm" | "unconfirm" | "options"; // Added "options" and "unconfirm" modes
   // For add mode
   addData?: {
     time: number;
@@ -28,7 +28,7 @@ interface CorrectionModalProps {
 
 export interface CorrectionData {
   detectionId?: string;
-  correctionType: "move" | "delete" | "add" | "confirm";
+  correctionType: "move" | "delete" | "add" | "confirm" | "unconfirm";
   reason: string;
   originalIndex?: number;
   originalTime?: number;
@@ -68,7 +68,7 @@ export function CorrectionModal({
   const [detectionType, setDetectionType] = useState("swing_low");
   const [structure, setStructure] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [internalMode, setInternalMode] = useState<"delete" | "move" | "add" | "confirm">("delete");
+  const [internalMode, setInternalMode] = useState<"delete" | "move" | "add" | "confirm" | "unconfirm">("delete");
 
   // Reset form when modal opens
   useEffect(() => {
@@ -105,7 +105,7 @@ export function CorrectionModal({
         reason: reason.trim(),
       };
 
-      if (effectiveMode === "delete" || effectiveMode === "confirm" || effectiveMode === "move") {
+      if (effectiveMode === "delete" || effectiveMode === "confirm" || effectiveMode === "unconfirm" || effectiveMode === "move") {
         if (detection) {
           correctionData.detectionId = detection.id;
           correctionData.originalIndex = detection.candleIndex;
@@ -162,6 +162,8 @@ export function CorrectionModal({
         return "Add Detection";
       case "confirm":
         return "Confirm Detection";
+      case "unconfirm":
+        return "Unconfirm Detection";
       default:
         return "Correction";
     }
@@ -178,6 +180,8 @@ export function CorrectionModal({
         return "Add a new detection that the algorithm missed.";
       case "confirm":
         return "Confirm this detection is correct.";
+      case "unconfirm":
+        return "Revert this detection back to pending status.";
       default:
         return "";
     }
@@ -193,6 +197,8 @@ export function CorrectionModal({
         return "bg-green-600 hover:bg-green-700";
       case "confirm":
         return "bg-blue-600 hover:bg-blue-700";
+      case "unconfirm":
+        return "bg-gray-600 hover:bg-gray-700";
       default:
         return "bg-gray-600 hover:bg-gray-700";
     }
@@ -357,7 +363,7 @@ export function CorrectionModal({
             )}
 
             {/* Reason - optional, show when action selected */}
-            {(!showOptionsUI || internalMode === "confirm" || internalMode === "delete") && (
+            {(!showOptionsUI || internalMode === "confirm" || internalMode === "unconfirm" || internalMode === "delete") && (
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-2">
                   Reason <span className="text-gray-500 text-xs">(optional)</span>
@@ -372,6 +378,8 @@ export function CorrectionModal({
                       ? "Why should this detection exist?"
                       : effectiveMode === "confirm"
                       ? "Any notes about this confirmation?"
+                      : effectiveMode === "unconfirm"
+                      ? "Why are you reverting this confirmation?"
                       : "Why are you modifying this?"
                   }
                   className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg
@@ -397,7 +405,7 @@ export function CorrectionModal({
               Cancel
             </button>
             {/* Only show submit button when action is selected */}
-            {(!showOptionsUI || internalMode === "confirm" || internalMode === "delete") && (
+            {(!showOptionsUI || internalMode === "confirm" || internalMode === "unconfirm" || internalMode === "delete") && (
               <button
                 type="submit"
                 disabled={isSubmitting}
@@ -415,6 +423,7 @@ export function CorrectionModal({
                     {effectiveMode === "move" && "Move"}
                     {effectiveMode === "add" && "Add Detection"}
                     {effectiveMode === "confirm" && "Confirm"}
+                    {effectiveMode === "unconfirm" && "Unconfirm"}
                   </>
                 )}
               </button>

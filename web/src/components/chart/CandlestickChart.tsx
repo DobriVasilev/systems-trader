@@ -36,6 +36,7 @@ interface CandlestickChartProps {
   hiddenMarkerIds?: string[]; // Markers to hide (e.g., during move operation)
   isInMoveMode?: boolean; // Show move mode cursor indicator
   movingMarkerColor?: string; // Color of the marker being moved
+  magnetMode?: boolean; // Snap to candle levels (same as holding Cmd/Ctrl)
   onCandleClick?: (candle: ChartCandle, index: number) => void;
   onMarkerClick?: (marker: ChartMarker) => void;
   onChartClick?: (time: number, price: number) => void;
@@ -54,6 +55,7 @@ export function CandlestickChart({
   hiddenMarkerIds = [],
   isInMoveMode = false,
   movingMarkerColor = "#ef5350",
+  magnetMode = false,
   onCandleClick,
   onMarkerClick,
   onChartClick,
@@ -401,8 +403,9 @@ export function CandlestickChart({
     const series = candleSeriesRef.current;
 
     const handleCrosshairMove = (param: { time?: Time; point?: { x: number; y: number } }) => {
-      // Check ref for immediate update
-      if (!isModifierHeldRef.current || !param.time || !param.point) {
+      // Check ref for immediate update (magnetMode prop OR keyboard modifier)
+      const shouldSnap = magnetMode || isModifierHeldRef.current;
+      if (!shouldSnap || !param.time || !param.point) {
         setSnapIndicator(null);
         return;
       }
@@ -455,7 +458,7 @@ export function CandlestickChart({
     return () => {
       chart.unsubscribeCrosshairMove(handleCrosshairMove);
     };
-  }, [candles]); // Only depend on candles, not isModifierHeld
+  }, [candles, magnetMode]); // Depend on candles and magnetMode
 
   // Check if position is within chart data area (not on scales)
   const isInChartArea = useCallback((x: number, y: number): boolean => {
@@ -612,8 +615,9 @@ export function CandlestickChart({
     if (newTime !== null && newPrice !== null) {
       let finalPrice = newPrice as number;
 
-      // Snap to candle level if modifier held
-      if (isModifierHeldRef.current) {
+      // Snap to candle level if magnet mode or modifier held
+      const shouldSnap = magnetMode || isModifierHeldRef.current;
+      if (shouldSnap) {
         const candle = candles.find(c => c.time === newTime);
         if (candle) {
           const priceLevels = [candle.high, candle.low, candle.open, candle.close];
@@ -659,7 +663,7 @@ export function CandlestickChart({
     setTimeout(() => {
       justFinishedDragRef.current = false;
     }, 100);
-  }, [draggingMarker, dragPosition, candles, onMarkerDrag]);
+  }, [draggingMarker, dragPosition, candles, magnetMode, onMarkerDrag]);
 
   // Handle context menu (right-click)
   const handleContextMenu = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
@@ -694,7 +698,7 @@ export function CandlestickChart({
 
       const x = event.clientX - rect.left;
       const y = event.clientY - rect.top;
-      const shouldSnap = event.metaKey || event.ctrlKey;
+      const shouldSnap = magnetMode || event.metaKey || event.ctrlKey;
 
       const timeScale = chartRef.current.timeScale();
       const time = timeScale.coordinateToTime(x);
@@ -763,7 +767,7 @@ export function CandlestickChart({
         }
       }
     },
-    [candles, findMarkerAtPosition, onCandleClick, onMarkerClick, onChartClick]
+    [candles, magnetMode, findMarkerAtPosition, onCandleClick, onMarkerClick, onChartClick]
   );
 
   // Global mouse up handler (in case mouse leaves the chart while dragging)
@@ -823,7 +827,7 @@ export function CandlestickChart({
       />
 
       {/* Snap/Magnet indicator overlay */}
-      {snapIndicator && isModifierHeld && (
+      {snapIndicator && (magnetMode || isModifierHeld) && (
         <>
           {/* Horizontal line at snap level - starts from candle, goes RIGHT only */}
           <div

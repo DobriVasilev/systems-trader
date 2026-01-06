@@ -93,6 +93,7 @@ model PatternSession {
   endTime        DateTime? // Optional: will be computed from candle data
   patternType    String   // "swings", "bos", "msb", "range", "false_breakout"
   patternVersion String   @default("1.0.0") // Algorithm version that generated detections
+  patternSettings Json?   // Pattern-specific settings (e.g., { detection_mode: "wicks" | "closes" })
 
   // Candle data snapshot (stored to ensure consistency)
   candleData     Json?    // Array of OHLCV candles
