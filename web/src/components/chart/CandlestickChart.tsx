@@ -100,6 +100,7 @@ export function CandlestickChart({
     const visibleRange = timeScale.getVisibleRange();
     if (visibleRange) {
       const key = `chart-position-${sessionId}`;
+      console.log('[Chart] Saving position', { from: visibleRange.from, to: visibleRange.to });
       localStorage.setItem(key, JSON.stringify({
         from: visibleRange.from,
         to: visibleRange.to,
@@ -113,16 +114,18 @@ export function CandlestickChart({
 
     const key = `chart-position-${sessionId}`;
     const saved = localStorage.getItem(key);
+    console.log('[Chart] Attempting to restore position', { saved });
     if (saved) {
       try {
         const { from, to } = JSON.parse(saved);
+        console.log('[Chart] Restoring position', { from, to });
         chartRef.current.timeScale().setVisibleRange({
           from: from as Time,
           to: to as Time,
         });
         return true;
       } catch (e) {
-        console.error("Failed to restore chart position:", e);
+        console.error("[Chart] Failed to restore chart position:", e);
       }
     }
     return false;
@@ -232,6 +235,13 @@ export function CandlestickChart({
   useEffect(() => {
     if (!candleSeriesRef.current || candles.length === 0) return;
 
+    console.log('[Chart] Updating candle data', {
+      candleCount: candles.length,
+      initialLoadDone: initialLoadDoneRef.current,
+      firstCandleTime: candles[0]?.time,
+      lastCandleTime: candles[candles.length - 1]?.time
+    });
+
     const chartData: CandlestickData<Time>[] = candles.map((c) => ({
       time: c.time as Time,
       open: c.open,
@@ -244,12 +254,16 @@ export function CandlestickChart({
 
     // Only fit content on initial load, and try to restore saved position
     if (!initialLoadDoneRef.current) {
+      console.log('[Chart] Initial load - will restore or fit');
       initialLoadDoneRef.current = true;
       // Try to restore saved position, otherwise fit content
       const restored = restoreChartPosition();
       if (!restored) {
+        console.log('[Chart] No saved position, fitting content');
         chartRef.current?.timeScale().fitContent();
       }
+    } else {
+      console.log('[Chart] Subsequent data update - NOT fitting content');
     }
   }, [candles, restoreChartPosition]);
 

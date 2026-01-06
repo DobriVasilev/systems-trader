@@ -283,6 +283,7 @@ export default function SessionDetailPage({
   };
 
   const handleCorrectionSubmit = async (correctionData: CorrectionData) => {
+    console.log('[Session] handleCorrectionSubmit called', { correctionType: correctionData.correctionType });
     try {
       const response = await fetch(`/api/sessions/${id}/corrections`, {
         method: "POST",
@@ -291,15 +292,18 @@ export default function SessionDetailPage({
       });
 
       const data = await response.json();
+      console.log('[Session] API response', { success: data.success, error: data.error });
 
       if (!data.success) {
         throw new Error(data.error || "Failed to submit correction");
       }
 
       // Refetch session to get updated data
+      console.log('[Session] About to refetch session data');
       await refetch();
+      console.log('[Session] Refetch completed');
     } catch (err) {
-      console.error("Error submitting correction:", err);
+      console.error("[Session] Error submitting correction:", err);
       throw err;
     }
   };

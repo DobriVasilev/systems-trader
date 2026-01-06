@@ -97,6 +97,7 @@ export function CorrectionModal({
     e.preventDefault();
     // Reason is now optional
 
+    console.log('[Modal] handleSubmit called', { effectiveMode, mode });
     setIsSubmitting(true);
     try {
       const correctionData: CorrectionData = {
@@ -131,10 +132,12 @@ export function CorrectionModal({
         correctionData.correctedStructure = structure || undefined;
       }
 
+      console.log('[Modal] Calling onSubmit with data', correctionData);
       await onSubmit(correctionData);
+      console.log('[Modal] onSubmit completed, calling onClose');
       onClose();
     } catch (err) {
-      console.error("Error submitting correction:", err);
+      console.error("[Modal] Error submitting correction:", err);
     } finally {
       setIsSubmitting(false);
     }
