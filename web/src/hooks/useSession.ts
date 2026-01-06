@@ -22,9 +22,19 @@ export interface PatternCorrection {
   id: string;
   detectionId: string | null;
   correctionType: "move" | "delete" | "add" | "modify" | "confirm" | "unconfirm";
-  originalData: Record<string, unknown> | null;
-  correctedData: Record<string, unknown>;
-  reason: string | null;
+  // Original state (for moves)
+  originalIndex: number | null;
+  originalTime: string | null;
+  originalPrice: number | null;
+  originalType: string | null;
+  // Corrected state (for moves/adds)
+  correctedIndex: number | null;
+  correctedTime: string | null;
+  correctedPrice: number | null;
+  correctedType: string | null;
+  correctedStructure: string | null;
+  // Reason for change
+  reason: string;
   user: {
     id: string;
     name: string | null;

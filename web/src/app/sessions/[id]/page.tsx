@@ -833,25 +833,13 @@ export default function SessionDetailPage({
               )}
             </div>
 
-            {/* Detections List with Search/Filter */}
-            {session?.detections && session.detections.length > 0 && (
-              <div className="flex-1 min-h-0 border-b border-gray-800">
-                <DetectionList
-                  detections={session.detections}
-                  onConfirm={(d) => openCorrectionModal("confirm", d)}
-                  onModify={(d) => openCorrectionModal("move", d)}
-                  onDelete={(d) => openCorrectionModal("delete", d)}
-                />
-              </div>
-            )}
-
-            {/* Corrections */}
-            {session?.corrections && session.corrections.length > 0 && (
-              <div className="p-4 border-b border-gray-800">
-                <h3 className="text-sm font-medium text-gray-400 mb-3">
-                  Corrections ({session.corrections.length})
-                </h3>
-                <div className="space-y-3">
+            {/* Change Log / Corrections - shown above detections */}
+            <div className="p-4 border-b border-gray-800">
+              <h3 className="text-sm font-medium text-gray-400 mb-3">
+                Change Log {session?.corrections?.length ? `(${session.corrections.length})` : ""}
+              </h3>
+              {session?.corrections && session.corrections.length > 0 ? (
+                <div className="space-y-3 max-h-64 overflow-y-auto">
                   {session.corrections.map((correction) => (
                     <div key={correction.id} className="text-sm bg-gray-800/50 rounded-lg p-2">
                       <div className="flex items-center gap-2 mb-1">
@@ -914,6 +902,22 @@ export default function SessionDetailPage({
                     </div>
                   ))}
                 </div>
+              ) : (
+                <p className="text-sm text-gray-500 text-center py-2">
+                  No changes logged yet
+                </p>
+              )}
+            </div>
+
+            {/* Detections List with Search/Filter */}
+            {session?.detections && session.detections.length > 0 && (
+              <div className="flex-1 min-h-0 border-b border-gray-800">
+                <DetectionList
+                  detections={session.detections}
+                  onConfirm={(d) => openCorrectionModal("confirm", d)}
+                  onModify={(d) => openCorrectionModal("move", d)}
+                  onDelete={(d) => openCorrectionModal("delete", d)}
+                />
               </div>
             )}
 
