@@ -43,6 +43,8 @@ model User {
   corrections      PatternCorrection[]
   comments         PatternComment[]
   events           PatternEvent[]
+  patternVotes     PatternVote[]
+  patternMentions  PatternCommentMention[]
 
   // Chat relations
   chatMessages       ChatMessage[]        @relation("ChatMessages")
@@ -247,6 +249,14 @@ model PatternCorrection {
   // Attachments
   attachments   Json?    // [{id, url, type, name, size}]
 
+  // Metadata (stores original status for undo, etc.)
+  metadata      Json?
+
+  // Voting (denormalized for performance)
+  upvotes       Int      @default(0)
+  downvotes     Int      @default(0)
+  score         Int      @default(0)  // upvotes - downvotes
+
   // Status
   status        String   @default("pending") // pending, applied, disputed
   resolvedAt    DateTime?
@@ -261,11 +271,13 @@ model PatternCorrection {
   detection     PatternDetection?  @relation(fields: [detectionId], references: [id], onDelete: SetNull)
   user          User               @relation(fields: [userId], references: [id])
   comments      PatternComment[]   @relation("CorrectionComments")
+  votes         PatternVote[]
 
   @@index([sessionId, status])
   @@index([userId])
   @@index([detectionId])
   @@index([createdAt])
+  @@index([score])
 }
 
 // ============================================================================
@@ -291,10 +303,20 @@ model PatternComment {
   canvasY       Float?
   candleTime    DateTime?
 
+  // Threading metadata
+  depth         Int      @default(0)  // Nesting level (0 = top level)
+  path          String?  // Materialized path: "rootId/parentId/thisId" for efficient tree queries
+
+  // Voting (denormalized for performance)
+  upvotes       Int      @default(0)
+  downvotes     Int      @default(0)
+  score         Int      @default(0)  // upvotes - downvotes
+
   // Status
   resolved      Boolean  @default(false)
   resolvedAt    DateTime?
   resolvedById  String?
+  isCollapsed   Boolean  @default(false)  // User collapsed this thread
 
   // Edit tracking
   editedAt      DateTime?
@@ -312,6 +334,8 @@ model PatternComment {
   correction    PatternCorrection? @relation("CorrectionComments", fields: [correctionId], references: [id], onDelete: SetNull)
   parent        PatternComment?    @relation("CommentReplies", fields: [parentId], references: [id], onDelete: SetNull)
   replies       PatternComment[]   @relation("CommentReplies")
+  votes         PatternVote[]
+  mentions      PatternCommentMention[]
 
   @@index([sessionId])
   @@index([detectionId])
@@ -319,6 +343,61 @@ model PatternComment {
   @@index([parentId])
   @@index([userId])
   @@index([createdAt])
+  @@index([score])
+  @@index([path])
+}
+
+// ============================================================================
+// PATTERN VOTING (Reddit-style upvote/downvote)
+// ============================================================================
+
+model PatternVote {
+  id            String   @id @default(cuid())
+  userId        String
+
+  // Polymorphic: vote on either comment or correction (one must be set)
+  commentId     String?
+  correctionId  String?
+
+  // Vote value: 1 = upvote, -1 = downvote
+  value         Int      // 1 or -1
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  user          User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  comment       PatternComment?    @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  correction    PatternCorrection? @relation(fields: [correctionId], references: [id], onDelete: Cascade)
+
+  // Each user can only vote once per item
+  @@unique([userId, commentId])
+  @@unique([userId, correctionId])
+  @@index([commentId])
+  @@index([correctionId])
+}
+
+// ============================================================================
+// PATTERN COMMENT MENTIONS (@mentions in comments)
+// ============================================================================
+
+model PatternCommentMention {
+  id            String   @id @default(cuid())
+  commentId     String
+  userId        String   // User being mentioned
+
+  // Notification tracking
+  notified      Boolean  @default(false)
+  notifiedAt    DateTime?
+
+  createdAt     DateTime @default(now())
+
+  // Relations
+  comment       PatternComment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([commentId, userId])
+  @@index([userId, notified])
 }
 
 // ============================================================================

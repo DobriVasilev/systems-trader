@@ -444,11 +444,11 @@ COMPARISON WITH SURROUNDING CANDLES:
     for (let j = 1; j <= lookback; j++) {
       const compareCandle = candles[i - j];
       const compareHigh = getHigh(compareCandle);
-      const comparison = currentHigh > compareHigh ? '>' : '≤';
-      const result = currentHigh > compareHigh ? '✓ PASS' : '✗ FAIL';
+      const comparison = currentHigh >= compareHigh ? '≥' : '<';
+      const result = currentHigh >= compareHigh ? '✓ PASS' : '✗ FAIL';
       swingHighReasoning += `  • Candle #${i - j}: ${priceType}=$${compareHigh.toFixed(2)} → $${currentHigh.toFixed(2)} ${comparison} $${compareHigh.toFixed(2)} → ${result}\n`;
 
-      if (compareHigh >= currentHigh) {
+      if (compareHigh > currentHigh) {
         isSwingHigh = false;
       }
     }
@@ -458,11 +458,11 @@ COMPARISON WITH SURROUNDING CANDLES:
     for (let j = 1; j <= lookback; j++) {
       const compareCandle = candles[i + j];
       const compareHigh = getHigh(compareCandle);
-      const comparison = currentHigh > compareHigh ? '>' : '≤';
-      const result = currentHigh > compareHigh ? '✓ PASS' : '✗ FAIL';
+      const comparison = currentHigh >= compareHigh ? '≥' : '<';
+      const result = currentHigh >= compareHigh ? '✓ PASS' : '✗ FAIL';
       swingHighReasoning += `  • Candle #${i + j}: ${priceType}=$${compareHigh.toFixed(2)} → $${currentHigh.toFixed(2)} ${comparison} $${compareHigh.toFixed(2)} → ${result}\n`;
 
-      if (compareHigh >= currentHigh) {
+      if (compareHigh > currentHigh) {
         isSwingHigh = false;
       }
     }
@@ -493,11 +493,11 @@ COMPARISON WITH SURROUNDING CANDLES:
     for (let j = 1; j <= lookback; j++) {
       const compareCandle = candles[i - j];
       const compareLow = getLow(compareCandle);
-      const comparison = currentLow < compareLow ? '<' : '≥';
-      const result = currentLow < compareLow ? '✓ PASS' : '✗ FAIL';
+      const comparison = currentLow <= compareLow ? '≤' : '>';
+      const result = currentLow <= compareLow ? '✓ PASS' : '✗ FAIL';
       swingLowReasoning += `  • Candle #${i - j}: ${priceTypeLow}=$${compareLow.toFixed(2)} → $${currentLow.toFixed(2)} ${comparison} $${compareLow.toFixed(2)} → ${result}\n`;
 
-      if (compareLow <= currentLow) {
+      if (compareLow < currentLow) {
         isSwingLow = false;
       }
     }
@@ -507,11 +507,11 @@ COMPARISON WITH SURROUNDING CANDLES:
     for (let j = 1; j <= lookback; j++) {
       const compareCandle = candles[i + j];
       const compareLow = getLow(compareCandle);
-      const comparison = currentLow < compareLow ? '<' : '≥';
-      const result = currentLow < compareLow ? '✓ PASS' : '✗ FAIL';
+      const comparison = currentLow <= compareLow ? '≤' : '>';
+      const result = currentLow <= compareLow ? '✓ PASS' : '✗ FAIL';
       swingLowReasoning += `  • Candle #${i + j}: ${priceTypeLow}=$${compareLow.toFixed(2)} → $${currentLow.toFixed(2)} ${comparison} $${compareLow.toFixed(2)} → ${result}\n`;
 
-      if (compareLow <= currentLow) {
+      if (compareLow < currentLow) {
         isSwingLow = false;
       }
     }
@@ -664,6 +664,80 @@ STRUCTURE ASSIGNMENT:
         pendingLow = pivot;
       }
     }
+  }
+
+  // Output any remaining pending swings that weren't confirmed
+  // These are swings at the edge of the data that haven't been confirmed yet
+  if (pendingHigh) {
+    const structure = lastConfirmedHigh
+      ? pendingHigh.price > lastConfirmedHigh.price
+        ? "HH"
+        : "LH"
+      : "H";
+
+    const pendingReasoning = `
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+⏳ PENDING SWING HIGH (Not yet confirmed - at data edge)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+This swing HIGH pivot at $${pendingHigh.price.toFixed(2)} has not been confirmed yet.
+It requires a future LOW pivot to break below the last confirmed low to be confirmed.
+
+Structure: ${structure} (tentative - may change with more data)
+Status: PENDING - waiting for confirmation from future price action
+`;
+
+    detections.push({
+      candleIndex: pendingHigh.index,
+      candleTime: new Date(pendingHigh.time * 1000),
+      price: pendingHigh.price,
+      detectionType: "swing_high",
+      structure,
+      confidence: 0.5, // Lower confidence for unconfirmed swings
+      metadata: {
+        confirmed: false,
+        pendingConfirmation: true,
+        pivotReasoning: pendingHigh.pivotReasoning,
+        confirmationReasoning: pendingReasoning,
+        fullReasoning: pendingHigh.pivotReasoning + pendingReasoning,
+      },
+    });
+  }
+
+  if (pendingLow) {
+    const structure = lastConfirmedLow
+      ? pendingLow.price > lastConfirmedLow.price
+        ? "HL"
+        : "LL"
+      : "L";
+
+    const pendingReasoning = `
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+⏳ PENDING SWING LOW (Not yet confirmed - at data edge)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+This swing LOW pivot at $${pendingLow.price.toFixed(2)} has not been confirmed yet.
+It requires a future HIGH pivot to break above the last confirmed high to be confirmed.
+
+Structure: ${structure} (tentative - may change with more data)
+Status: PENDING - waiting for confirmation from future price action
+`;
+
+    detections.push({
+      candleIndex: pendingLow.index,
+      candleTime: new Date(pendingLow.time * 1000),
+      price: pendingLow.price,
+      detectionType: "swing_low",
+      structure,
+      confidence: 0.5, // Lower confidence for unconfirmed swings
+      metadata: {
+        confirmed: false,
+        pendingConfirmation: true,
+        pivotReasoning: pendingLow.pivotReasoning,
+        confirmationReasoning: pendingReasoning,
+        fullReasoning: pendingLow.pivotReasoning + pendingReasoning,
+      },
+    });
   }
 
   // Sort by candle time

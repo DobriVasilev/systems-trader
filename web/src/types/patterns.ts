@@ -1029,7 +1029,10 @@ export type DetectionType =
   | "false_breakout_high"
   | "false_breakout_low";
 
-export type StructureType = "HH" | "HL" | "LH" | "LL";
+// Structure types for swings
+// HH = Higher High, HL = Higher Low, LH = Lower High, LL = Lower Low
+// H = First High (no previous high to compare), L = First Low (no previous low to compare)
+export type StructureType = "HH" | "HL" | "LH" | "LL" | "H" | "L";
 
 export type DetectionStatus = "pending" | "confirmed" | "rejected" | "moved";
 

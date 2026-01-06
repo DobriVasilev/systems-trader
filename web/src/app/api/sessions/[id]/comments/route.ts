@@ -6,6 +6,19 @@ import { broadcastCommentCreated, broadcastCommentUpdated, broadcastCommentDelet
 import { logCommentCreated, logCommentUpdated, logCommentResolved, logCommentDeleted } from "@/lib/events";
 import { validate, createCommentSchema, updateCommentSchema } from "@/lib/validation";
 
+// Extract mention user IDs from content (format: @[Name](userId))
+function extractMentionIds(content: string): string[] {
+  const mentionRegex = /@\[([^\]]+)\]\(([^)]+)\)/g;
+  const ids: string[] = [];
+  let match;
+
+  while ((match = mentionRegex.exec(content)) !== null) {
+    ids.push(match[2]);
+  }
+
+  return ids;
+}
+
 // GET /api/sessions/[id]/comments - Get all comments for a session
 export async function GET(
   request: NextRequest,
@@ -144,10 +157,27 @@ export async function POST(
       );
     }
 
+    // Calculate depth and path for threading
+    let depth = 0;
+    let path: string | null = null;
+
+    if (parentId) {
+      const parentComment = await prisma.patternComment.findUnique({
+        where: { id: parentId },
+        select: { depth: true, path: true },
+      });
+      if (parentComment) {
+        depth = parentComment.depth + 1;
+        path = parentComment.path ? `${parentComment.path}/${parentId}` : parentId;
+      }
+    }
+
+    const commentId = generateUlid();
+
     // Create the comment
     const comment = await prisma.patternComment.create({
       data: {
-        id: generateUlid(),
+        id: commentId,
         sessionId: id,
         userId: session.user.id,
         content: content.trim(),
@@ -157,6 +187,8 @@ export async function POST(
         candleTime: candleTime ? new Date(candleTime) : null,
         canvasX: canvasX || null,
         canvasY: canvasY || null,
+        depth,
+        path: path ? `${path}/${commentId}` : commentId,
       },
       include: {
         user: {
@@ -164,6 +196,7 @@ export async function POST(
             id: true,
             name: true,
             image: true,
+            username: true,
           },
         },
         detection: {
@@ -176,6 +209,26 @@ export async function POST(
       },
     });
 
+    // Extract and create mentions
+    const mentionedUserIds = extractMentionIds(content);
+    if (mentionedUserIds.length > 0) {
+      // Filter out self-mentions and duplicate IDs
+      const uniqueMentionIds = [...new Set(mentionedUserIds)].filter(
+        (userId) => userId !== session.user.id
+      );
+
+      // Create mention records for each mentioned user
+      if (uniqueMentionIds.length > 0) {
+        await prisma.patternCommentMention.createMany({
+          data: uniqueMentionIds.map((userId) => ({
+            commentId: comment.id,
+            userId,
+          })),
+          skipDuplicates: true, // Ignore if already mentioned
+        });
+      }
+    }
+
     // Broadcast real-time update
     await broadcastCommentCreated(id, comment.id, session.user.id);
 
@@ -185,6 +238,7 @@ export async function POST(
       detectionId: detectionId || null,
       correctionId: correctionId || null,
       parentId: parentId || null,
+      mentions: mentionedUserIds,
     });
 
     return NextResponse.json({

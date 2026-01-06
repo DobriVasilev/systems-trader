@@ -14,6 +14,7 @@ import { CommentInput, CommentThread } from "@/components/comments";
 import { OnlineUsers, CursorOverlay } from "@/components/realtime";
 import { DetectionList } from "@/components/detections/DetectionList";
 import { ShareModal } from "@/components/sharing/ShareModal";
+import { usePermalinks } from "@/hooks/usePermalinks";
 
 function formatDate(dateString: string): string {
   const date = new Date(dateString);
@@ -85,9 +86,32 @@ export default function SessionDetailPage({
   // Pattern reasoning modal state
   const [isPatternReasoningOpen, setIsPatternReasoningOpen] = useState(false);
 
+  // Permalink support (deep links to comments/corrections/detections)
+  const {
+    highlightedCommentId,
+    highlightedCorrectionId,
+    highlightedDetectionId,
+    copyPermalink,
+  } = usePermalinks();
+
   // Chart navigation/highlight state
   const [highlightMarkerId, setHighlightMarkerId] = useState<string | null>(null);
   const [navigateToTime, setNavigateToTime] = useState<number | null>(null);
+
+  // Handle detection permalink - navigate to chart when detection permalink is set
+  useEffect(() => {
+    if (highlightedDetectionId && session?.detections) {
+      const detection = session.detections.find((d) => d.id === highlightedDetectionId);
+      if (detection) {
+        const candleTime = new Date(detection.candleTime).getTime() / 1000;
+        setNavigateToTime(candleTime);
+        setHighlightMarkerId(highlightedDetectionId);
+        // Clear highlight after 3 seconds
+        const timeout = setTimeout(() => setHighlightMarkerId(null), 3000);
+        return () => clearTimeout(timeout);
+      }
+    }
+  }, [highlightedDetectionId, session?.detections]);
 
   // Collapsible section states
   const [sectionsCollapsed, setSectionsCollapsed] = useState({

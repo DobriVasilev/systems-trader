@@ -41,6 +41,12 @@ export const REALTIME_EVENTS = {
   COMMENT_UPDATED: "comment:updated",
   COMMENT_DELETED: "comment:deleted",
 
+  // Vote events
+  VOTE_CHANGED: "vote:changed",
+
+  // Feed events
+  FEED_ITEM_CREATED: "feed:item:created",
+
   // Session events
   SESSION_UPDATED: "session:updated",
 

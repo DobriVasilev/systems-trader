@@ -128,133 +128,159 @@ export async function POST(
       );
     }
 
-    // Create the correction
-    const correction = await prisma.patternCorrection.create({
-      data: {
-        id: generateUlid(),
-        sessionId: id,
-        detectionId: detectionId || null,
-        userId: session.user.id,
-        correctionType,
-        reason,
-        originalIndex: originalIndex || null,
-        originalTime: originalTime ? new Date(originalTime) : null,
-        originalPrice: originalPrice || null,
-        originalType: originalType || null,
-        correctedIndex: correctedIndex || null,
-        correctedTime: correctedTime ? new Date(correctedTime) : null,
-        correctedPrice: correctedPrice || null,
-        correctedType: correctedType || null,
-        correctedStructure: correctedStructure || null,
-        status: "pending",
-      },
-      include: {
-        user: {
-          select: {
-            id: true,
-            name: true,
-            image: true,
-          },
+    // Get original detection status before any modifications (for undo support)
+    let originalDetectionStatus: string | null = null;
+    let originalDetection: Awaited<ReturnType<typeof prisma.patternDetection.findUnique>> | null = null;
+
+    if (detectionId) {
+      originalDetection = await prisma.patternDetection.findUnique({
+        where: { id: detectionId },
+      });
+      originalDetectionStatus = originalDetection?.status || null;
+    }
+
+    // Use a transaction to ensure atomic updates
+    const result = await prisma.$transaction(async (tx) => {
+      // Create the correction with original status stored in metadata
+      const correction = await tx.patternCorrection.create({
+        data: {
+          id: generateUlid(),
+          sessionId: id,
+          detectionId: detectionId || null,
+          userId: session.user.id,
+          correctionType,
+          reason,
+          originalIndex: originalIndex || null,
+          originalTime: originalTime ? new Date(originalTime) : null,
+          originalPrice: originalPrice || null,
+          originalType: originalType || null,
+          correctedIndex: correctedIndex || null,
+          correctedTime: correctedTime ? new Date(correctedTime) : null,
+          correctedPrice: correctedPrice || null,
+          correctedType: correctedType || null,
+          correctedStructure: correctedStructure || null,
+          status: "pending",
+          metadata: JSON.parse(JSON.stringify({
+            originalStatus: originalDetectionStatus, // Store for undo support
+          })),
         },
-        detection: true,
-      },
-    });
-
-    // If it's a delete or confirm correction, update the detection status
-    if (correctionType === "delete" && detectionId) {
-      await prisma.patternDetection.update({
-        where: { id: detectionId },
-        data: { status: "rejected" },
-      });
-    } else if (correctionType === "confirm" && detectionId) {
-      await prisma.patternDetection.update({
-        where: { id: detectionId },
-        data: { status: "confirmed" },
-      });
-    } else if (correctionType === "unconfirm" && detectionId) {
-      // Revert confirmed status back to pending
-      await prisma.patternDetection.update({
-        where: { id: detectionId },
-        data: { status: "pending" },
-      });
-    } else if (correctionType === "move" && detectionId) {
-      // Get original detection to preserve its metadata
-      const originalDetection = await prisma.patternDetection.findUnique({
-        where: { id: detectionId },
+        include: {
+          user: {
+            select: {
+              id: true,
+              name: true,
+              image: true,
+            },
+          },
+          detection: true,
+        },
       });
 
-      // Mark original as moved
-      await prisma.patternDetection.update({
-        where: { id: detectionId },
-        data: { status: "moved" },
-      });
+      let newDetectionId: string | null = null;
 
-      // Create new detection at the moved position
-      if (correctedTime && correctedPrice) {
-        // Preserve detection_mode from original detection
-        const originalMetadata = originalDetection?.metadata as Record<string, unknown> | null;
-        const detectionMode = originalMetadata?.detection_mode || "wicks";
+      // If it's a delete or confirm correction, update the detection status
+      if (correctionType === "delete" && detectionId) {
+        await tx.patternDetection.update({
+          where: { id: detectionId },
+          data: { status: "rejected" },
+        });
+      } else if (correctionType === "confirm" && detectionId) {
+        await tx.patternDetection.update({
+          where: { id: detectionId },
+          data: { status: "confirmed" },
+        });
+      } else if (correctionType === "unconfirm" && detectionId) {
+        // Revert confirmed status back to pending
+        await tx.patternDetection.update({
+          where: { id: detectionId },
+          data: { status: "pending" },
+        });
+      } else if (correctionType === "move" && detectionId) {
+        // Mark original as moved
+        await tx.patternDetection.update({
+          where: { id: detectionId },
+          data: { status: "moved" },
+        });
 
-        const movedDetection = await prisma.patternDetection.create({
+        // Create new detection at the moved position
+        if (correctedTime && correctedPrice) {
+          // Preserve detection_mode and ORIGINAL STATUS from original detection
+          const originalMetadata = originalDetection?.metadata as Record<string, unknown> | null;
+          const detectionMode = originalMetadata?.detection_mode || "wicks";
+
+          const movedDetection = await tx.patternDetection.create({
+            data: {
+              id: generateUlid(),
+              sessionId: id,
+              candleIndex: correctedIndex || 0,
+              candleTime: new Date(correctedTime),
+              price: correctedPrice,
+              detectionType: correctedType || originalType || "swing_low",
+              structure: correctedStructure || null,
+              // FIXED: Preserve original status instead of always setting to "confirmed"
+              status: originalDetectionStatus || "confirmed",
+              metadata: JSON.parse(JSON.stringify({
+                source: "moved",
+                movedFrom: detectionId,
+                movedBy: session.user.id,
+                correctionId: correction.id,
+                detection_mode: detectionMode,
+                originalStatus: originalDetectionStatus, // Store for reference
+              })),
+            },
+          });
+
+          newDetectionId = movedDetection.id;
+        }
+      }
+
+      // If it's an "add" correction, create a new detection
+      if (correctionType === "add" && correctedTime && correctedPrice) {
+        // Get session settings for detection mode
+        const sessionSettings = patternSession.patternSettings as { detection_mode?: "wicks" | "closes" } | null;
+        const user = await tx.user.findUnique({
+          where: { id: session.user.id },
+          select: { preferences: true },
+        });
+        const userPrefs = user?.preferences as { swingDetectionMode?: "wicks" | "closes" } | null;
+        const detectionMode = sessionSettings?.detection_mode || userPrefs?.swingDetectionMode || "wicks";
+
+        const newDetection = await tx.patternDetection.create({
           data: {
             id: generateUlid(),
             sessionId: id,
             candleIndex: correctedIndex || 0,
             candleTime: new Date(correctedTime),
             price: correctedPrice,
-            detectionType: correctedType || originalType || "swing_low",
+            detectionType: correctedType || "swing_low",
             structure: correctedStructure || null,
             status: "confirmed",
             metadata: JSON.parse(JSON.stringify({
-              source: "moved",
-              movedFrom: detectionId,
-              movedBy: session.user.id,
+              source: "manual",
+              addedBy: session.user.id,
               correctionId: correction.id,
-              detection_mode: detectionMode, // Preserve the detection mode
+              detection_mode: detectionMode,
             })),
           },
         });
 
-        // Broadcast the new detection
-        await broadcastDetectionUpdated(id, movedDetection.id);
+        // Update the correction with the new detection ID
+        await tx.patternCorrection.update({
+          where: { id: correction.id },
+          data: { detectionId: newDetection.id },
+        });
+
+        newDetectionId = newDetection.id;
       }
-    }
 
-    // If it's an "add" correction, create a new detection
-    if (correctionType === "add" && correctedTime && correctedPrice) {
-      // Get session settings for detection mode
-      const sessionSettings = patternSession.patternSettings as { detection_mode?: "wicks" | "closes" } | null;
-      const user = await prisma.user.findUnique({
-        where: { id: session.user.id },
-        select: { preferences: true },
-      });
-      const userPrefs = user?.preferences as { swingDetectionMode?: "wicks" | "closes" } | null;
-      const detectionMode = sessionSettings?.detection_mode || userPrefs?.swingDetectionMode || "wicks";
+      return { correction, newDetectionId };
+    });
 
-      const newDetection = await prisma.patternDetection.create({
-        data: {
-          id: generateUlid(),
-          sessionId: id,
-          candleIndex: correctedIndex || 0,
-          candleTime: new Date(correctedTime),
-          price: correctedPrice,
-          detectionType: correctedType || "swing_low",
-          structure: correctedStructure || null,
-          status: "confirmed",
-          metadata: JSON.parse(JSON.stringify({
-            source: "manual",
-            addedBy: session.user.id,
-            correctionId: correction.id,
-            detection_mode: detectionMode, // Use session/user detection mode setting
-          })),
-        },
-      });
+    const { correction, newDetectionId } = result;
 
-      // Update the correction with the new detection ID
-      await prisma.patternCorrection.update({
-        where: { id: correction.id },
-        data: { detectionId: newDetection.id },
-      });
+    // Broadcast real-time updates (outside transaction for better performance)
+    if (newDetectionId) {
+      await broadcastDetectionUpdated(id, newDetectionId);
     }
 
     // Broadcast real-time updates

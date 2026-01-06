@@ -25,6 +25,25 @@ export const updateSessionSchema = z.object({
   candleData: z.record(z.string(), z.unknown()).optional(),
 });
 
+// Detection type enum - matches DetectionType from types/patterns.ts
+export const detectionTypeEnum = z.enum([
+  "swing_high",
+  "swing_low",
+  "bos_bullish",
+  "bos_bearish",
+  "msb_bullish",
+  "msb_bearish",
+  "range_high",
+  "range_low",
+  "range_mid",
+  "fib_level",
+  "false_breakout_high",
+  "false_breakout_low",
+]);
+
+// Structure type enum - matches StructureType from types/patterns.ts
+export const structureTypeEnum = z.enum(["HH", "HL", "LH", "LL", "H", "L"]);
+
 // Detection schemas
 export const runDetectionSchema = z.object({
   action: z.literal("run_detection"),
@@ -35,8 +54,8 @@ export const addManualDetectionSchema = z.object({
   candleIndex: z.number().int().min(0),
   candleTime: z.number().positive(),
   price: z.number().positive(),
-  detectionType: z.string().min(1).max(50),
-  structure: z.string().max(10).optional(),
+  detectionType: detectionTypeEnum,
+  structure: structureTypeEnum.optional(),
 });
 
 export const detectionActionSchema = z.discriminatedUnion("action", [
@@ -53,13 +72,13 @@ export const createCorrectionSchema = z.object({
   originalIndex: z.number().int().min(0).optional().nullable(),
   originalTime: z.string().or(z.number()).optional().nullable(),
   originalPrice: z.number().positive().optional().nullable(),
-  originalType: z.string().max(50).optional().nullable(),
+  originalType: detectionTypeEnum.optional().nullable(),
   // For move/add corrections - corrected values
   correctedIndex: z.number().int().min(0).optional().nullable(),
   correctedTime: z.string().or(z.number()).optional().nullable(),
   correctedPrice: z.number().positive().optional().nullable(),
-  correctedType: z.string().max(50).optional().nullable(),
-  correctedStructure: z.string().max(10).optional().nullable(),
+  correctedType: detectionTypeEnum.optional().nullable(),
+  correctedStructure: structureTypeEnum.optional().nullable(),
 });
 
 // Comment schemas

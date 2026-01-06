@@ -58,43 +58,47 @@ export async function DELETE(
       );
     }
 
+    // Get original status from correction metadata (for proper undo)
+    const correctionMetadata = correction.metadata as { originalStatus?: string } | null;
+    const originalStatus = correctionMetadata?.originalStatus || "pending";
+
     // Reverse the correction based on type
     switch (correction.correctionType) {
       case "delete":
-        // Undo delete: set detection back to pending
+        // Undo delete: restore detection to its original status
         if (correction.detectionId) {
           await prisma.patternDetection.update({
             where: { id: correction.detectionId },
-            data: { status: "pending" },
+            data: { status: originalStatus },
           });
           await broadcastDetectionUpdated(id, correction.detectionId);
         }
         break;
 
       case "confirm":
-        // Undo confirm: set detection back to pending
+        // Undo confirm: restore detection to its original status (was pending before confirm)
         if (correction.detectionId) {
           await prisma.patternDetection.update({
             where: { id: correction.detectionId },
-            data: { status: "pending" },
+            data: { status: originalStatus },
           });
           await broadcastDetectionUpdated(id, correction.detectionId);
         }
         break;
 
       case "unconfirm":
-        // Undo unconfirm: set detection back to confirmed
+        // Undo unconfirm: restore detection to its original status (was confirmed before unconfirm)
         if (correction.detectionId) {
           await prisma.patternDetection.update({
             where: { id: correction.detectionId },
-            data: { status: "confirmed" },
+            data: { status: originalStatus },
           });
           await broadcastDetectionUpdated(id, correction.detectionId);
         }
         break;
 
       case "move":
-        // Undo move: delete the moved detection, restore original
+        // Undo move: delete the moved detection, restore original to its previous status
         if (correction.detectionId) {
           // Find the detection that was created by this move
           const movedDetection = await prisma.patternDetection.findFirst({
@@ -114,10 +118,10 @@ export async function DELETE(
             });
           }
 
-          // Restore the original detection
+          // Restore the original detection to its previous status
           await prisma.patternDetection.update({
             where: { id: correction.detectionId },
-            data: { status: "pending" },
+            data: { status: originalStatus },
           });
           await broadcastDetectionUpdated(id, correction.detectionId);
         }

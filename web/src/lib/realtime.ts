@@ -140,6 +140,42 @@ export async function broadcastSessionUpdated(sessionId: string): Promise<void> 
 }
 
 /**
+ * Broadcast vote changes
+ */
+export async function broadcastVoteChanged(
+  sessionId: string,
+  targetType: "comment" | "correction",
+  targetId: string,
+  upvotes: number,
+  downvotes: number,
+  score: number
+): Promise<void> {
+  await publishToSession(sessionId, REALTIME_EVENTS.VOTE_CHANGED, {
+    targetType,
+    targetId,
+    upvotes,
+    downvotes,
+    score,
+  });
+}
+
+/**
+ * Broadcast feed item created (for "new items" banner)
+ */
+export async function broadcastFeedItemCreated(
+  sessionId: string,
+  itemType: "correction" | "comment",
+  itemId: string,
+  parentId?: string
+): Promise<void> {
+  await publishToSession(sessionId, REALTIME_EVENTS.FEED_ITEM_CREATED, {
+    itemType,
+    itemId,
+    parentId,
+  });
+}
+
+/**
  * Broadcast cursor movement
  */
 export async function broadcastCursorMove(
