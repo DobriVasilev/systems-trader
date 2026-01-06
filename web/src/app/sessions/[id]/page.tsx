@@ -10,7 +10,7 @@ import { CandlestickChart, ChartCandle, ChartMarker } from "@/components/chart/C
 import { ChartToolbar, ChartTool } from "@/components/chart/ChartToolbar";
 import { ContextMenu } from "@/components/chart/ContextMenu";
 import { CorrectionModal, CorrectionData } from "@/components/corrections";
-import { CommentInput, CommentThread } from "@/components/comments";
+import { CommentInput, CommentThread, ThreadViewModal, VoteButtons, RichTextEditor } from "@/components/comments";
 import { OnlineUsers, CursorOverlay } from "@/components/realtime";
 import { DetectionList } from "@/components/detections/DetectionList";
 import { ShareModal } from "@/components/sharing/ShareModal";
@@ -85,6 +85,34 @@ export default function SessionDetailPage({
 
   // Pattern reasoning modal state
   const [isPatternReasoningOpen, setIsPatternReasoningOpen] = useState(false);
+
+  // Thread view modal state (for Reddit-style threaded comments)
+  const [threadViewCorrection, setThreadViewCorrection] = useState<{
+    id: string;
+    correctionType: string;
+    reason: string;
+    createdAt: string;
+    upvotes: number;
+    downvotes: number;
+    score: number;
+    userVote: number | null;
+    user: {
+      id: string;
+      name: string | null;
+      image: string | null;
+      username: string | null;
+    };
+    detectionId: string | null;
+    originalIndex: number | null;
+    originalTime: string | null;
+    originalPrice: number | null;
+    originalType: string | null;
+    correctedIndex: number | null;
+    correctedTime: string | null;
+    correctedPrice: number | null;
+    correctedType: string | null;
+    correctedStructure: string | null;
+  } | null>(null);
 
   // Permalink support (deep links to comments/corrections/detections)
   const {
@@ -1000,14 +1028,14 @@ export default function SessionDetailPage({
               )}
             </div>
 
-            {/* Change Log / Corrections - Collapsible */}
+            {/* Change Log / Corrections - Collapsible - Now with Reddit-style threading */}
             <div className="border-b border-gray-800">
               <button
                 onClick={() => setSectionsCollapsed(s => ({ ...s, changeLog: !s.changeLog }))}
                 className="w-full p-4 flex items-center justify-between hover:bg-gray-800/30 transition-colors"
               >
                 <h3 className="text-sm font-medium text-gray-400">
-                  Change Log {session?.corrections?.length ? `(${session.corrections.length})` : ""}
+                  Discussion {session?.corrections?.length ? `(${session.corrections.length})` : ""}
                 </h3>
                 <svg
                   className={`w-4 h-4 text-gray-500 transition-transform ${sectionsCollapsed.changeLog ? '' : 'rotate-180'}`}
@@ -1019,93 +1047,129 @@ export default function SessionDetailPage({
               {!sectionsCollapsed.changeLog && (
                 <div className="px-4 pb-4">
                   {session?.corrections && session.corrections.length > 0 ? (
-                    <div className="space-y-3 max-h-64 overflow-y-auto">
+                    <div className="space-y-2 max-h-96 overflow-y-auto">
                       {session.corrections.map((correction) => {
-                        const detection = correction.detectionId
-                          ? session.detections.find(d => d.id === correction.detectionId)
-                          : null;
+                        // Count replies (comments on this correction)
+                        const replyCount = session.comments?.filter(c => c.correctionId === correction.id).length || 0;
+
                         return (
                           <div
                             key={correction.id}
-                            className="text-sm bg-gray-800/50 rounded-lg p-2 hover:bg-gray-700/50 cursor-pointer transition-colors"
+                            className="text-sm bg-gray-800/50 rounded-lg p-3 hover:bg-gray-700/50 cursor-pointer transition-colors border border-transparent hover:border-gray-600"
                             onClick={() => {
-                              if (detection) {
-                                setSelectedDetection(detection);
-                                setCorrectionMode("options");
-                                setCorrectionModalOpen(true);
-                              }
+                              // Open thread view modal
+                              setThreadViewCorrection({
+                                id: correction.id,
+                                correctionType: correction.correctionType,
+                                reason: correction.reason,
+                                createdAt: correction.createdAt,
+                                upvotes: (correction as { upvotes?: number }).upvotes || 0,
+                                downvotes: (correction as { downvotes?: number }).downvotes || 0,
+                                score: (correction as { score?: number }).score || 0,
+                                userVote: null,
+                                user: {
+                                  id: correction.user.id,
+                                  name: correction.user.name,
+                                  image: correction.user.image,
+                                  username: null,
+                                },
+                                detectionId: correction.detectionId || null,
+                                originalIndex: correction.originalIndex,
+                                originalTime: correction.originalTime,
+                                originalPrice: correction.originalPrice,
+                                originalType: correction.originalType,
+                                correctedIndex: correction.correctedIndex,
+                                correctedTime: correction.correctedTime,
+                                correctedPrice: correction.correctedPrice,
+                                correctedType: correction.correctedType,
+                                correctedStructure: correction.correctedStructure,
+                              });
                             }}
                           >
-                            <div className="flex items-center gap-2 mb-1">
+                            {/* Header with user and type */}
+                            <div className="flex items-center gap-2 mb-2">
+                              <span
+                                className={`px-1.5 py-0.5 text-xs font-medium rounded ${
+                                  {
+                                    move: "bg-yellow-900/60 text-yellow-300",
+                                    delete: "bg-red-900/60 text-red-300",
+                                    add: "bg-green-900/60 text-green-300",
+                                    modify: "bg-blue-900/60 text-blue-300",
+                                    confirm: "bg-blue-900/60 text-blue-300",
+                                    unconfirm: "bg-orange-900/60 text-orange-300",
+                                  }[correction.correctionType] || "bg-gray-800 text-gray-300"
+                                }`}
+                              >
+                                {correction.correctionType}
+                              </span>
+                              <span className="text-gray-500">by</span>
                               {correction.user.image ? (
                                 <img
                                   src={correction.user.image}
-                                  alt={correction.user.name || ""}
+                                  alt=""
                                   className="w-4 h-4 rounded-full"
                                 />
                               ) : (
                                 <div className="w-4 h-4 rounded-full bg-gray-700" />
                               )}
-                              <span className="text-gray-300">{correction.user.name}</span>
-                              <span className="text-gray-600 text-xs">
+                              <span className="text-gray-300 text-xs">{correction.user.name}</span>
+                              <span className="text-gray-600 text-xs ml-auto">
                                 {formatDate(correction.createdAt)}
                               </span>
+                            </div>
+
+                            {/* Content preview */}
+                            {correction.reason && (
+                              <p className="text-gray-300 text-sm line-clamp-2 mb-2">
+                                {correction.reason}
+                              </p>
+                            )}
+
+                            {/* Actions row */}
+                            <div className="flex items-center gap-3 text-xs">
+                              {/* Vote display (read-only in list, full in modal) */}
+                              <span className="text-gray-500 flex items-center gap-1">
+                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                                </svg>
+                                {(correction as { score?: number }).score || 0}
+                              </span>
+
+                              {/* Comments count */}
+                              <button
+                                className="text-gray-500 hover:text-gray-300 flex items-center gap-1"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                                </svg>
+                                {replyCount} {replyCount === 1 ? 'comment' : 'comments'}
+                              </button>
+
+                              {/* Go to chart */}
                               {correction.detectionId && (
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     handleNavigateToDetection(correction.detectionId!);
                                   }}
-                                  className="text-xs px-1.5 py-0.5 bg-blue-900/50 text-blue-300 rounded hover:bg-blue-800/50 transition-colors flex items-center gap-1 ml-auto"
-                                  title="Go to detection on chart"
+                                  className="text-blue-400 hover:text-blue-300 flex items-center gap-1 ml-auto"
                                 >
                                   <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                                   </svg>
-                                  Go to
+                                  View
                                 </button>
                               )}
-                            </div>
-                            <div className="ml-6">
-                              <span
-                                className={`px-1.5 py-0.5 text-xs rounded ${
-                                  {
-                                    move: "bg-yellow-900 text-yellow-300",
-                                    delete: "bg-red-900 text-red-300",
-                                    add: "bg-green-900 text-green-300",
-                                    modify: "bg-blue-900 text-blue-300",
-                                    confirm: "bg-green-900 text-green-300",
-                                    unconfirm: "bg-orange-900 text-orange-300",
-                                  }[correction.correctionType] || "bg-gray-800 text-gray-300"
-                                }`}
-                              >
-                                {correction.correctionType}
-                              </span>
-                              {correction.reason && (
-                                <p className="text-gray-400 mt-1">{correction.reason}</p>
-                              )}
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  navigator.clipboard.writeText(correction.id);
-                                }}
-                                className="text-xs text-gray-600 hover:text-gray-400 mt-1 flex items-center gap-1"
-                                title="Copy correction ID"
-                              >
-                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                                </svg>
-                                {correction.id.slice(0, 8)}...
-                              </button>
                             </div>
                           </div>
                         );
                       })}
                     </div>
                   ) : (
-                    <p className="text-sm text-gray-500 text-center py-2">
-                      No changes logged yet
+                    <p className="text-sm text-gray-500 text-center py-4">
+                      No discussion yet. Make a correction to start a thread!
                     </p>
                   )}
                 </div>
@@ -1334,6 +1398,16 @@ export default function SessionDetailPage({
           isPublic={session.isPublic}
         />
       )}
+
+      {/* Thread View Modal - Reddit-style threaded comments */}
+      <ThreadViewModal
+        isOpen={!!threadViewCorrection}
+        onClose={() => setThreadViewCorrection(null)}
+        sessionId={id}
+        correction={threadViewCorrection}
+        currentUserId={authSession?.user?.id}
+        onNavigateToDetection={handleNavigateToDetection}
+      />
 
       {/* Pattern Reasoning Modal */}
       {isPatternReasoningOpen && session && (

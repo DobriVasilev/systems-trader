@@ -5,6 +5,7 @@ import { generateUlid } from "@/lib/ulid";
 import { broadcastCommentCreated, broadcastCommentUpdated, broadcastCommentDeleted } from "@/lib/realtime";
 import { logCommentCreated, logCommentUpdated, logCommentResolved, logCommentDeleted } from "@/lib/events";
 import { validate, createCommentSchema, updateCommentSchema } from "@/lib/validation";
+import { SortType, sortItems, getPrismaOrderBy } from "@/lib/sorting";
 
 // Extract mention user IDs from content (format: @[Name](userId))
 function extractMentionIds(content: string): string[] {
@@ -35,12 +36,18 @@ export async function GET(
   }
 
   try {
+    // Parse query params
+    const { searchParams } = new URL(request.url);
+    const correctionId = searchParams.get("correctionId");
+    const sort = (searchParams.get("sort") as SortType) || "best";
+
     // Check access
     const patternSession = await prisma.patternSession.findFirst({
       where: {
         id,
         OR: [
           { createdById: session.user.id },
+          { isPublic: true },
           { shares: { some: { userId: session.user.id } } },
         ],
       },
@@ -53,17 +60,68 @@ export async function GET(
       );
     }
 
+    // Build where clause
+    const whereClause: Record<string, unknown> = {
+      sessionId: id,
+      parentId: null, // Only top-level comments
+    };
+
+    // Filter by correctionId if provided (for thread view)
+    if (correctionId) {
+      whereClause.correctionId = correctionId;
+    }
+
+    // Get the order by based on sort type
+    const orderBy = getPrismaOrderBy(sort);
+
+    // Recursive function to build nested reply include
+    const buildReplyInclude = (depth: number): object => {
+      if (depth <= 0) {
+        return {
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                image: true,
+                username: true,
+              },
+            },
+            _count: {
+              select: { replies: true },
+            },
+          },
+          orderBy,
+        };
+      }
+      return {
+        include: {
+          user: {
+            select: {
+              id: true,
+              name: true,
+              image: true,
+              username: true,
+            },
+          },
+          _count: {
+            select: { replies: true },
+          },
+          replies: buildReplyInclude(depth - 1),
+        },
+        orderBy,
+      };
+    };
+
     const comments = await prisma.patternComment.findMany({
-      where: {
-        sessionId: id,
-        parentId: null, // Only top-level comments
-      },
+      where: whereClause,
       include: {
         user: {
           select: {
             id: true,
             name: true,
             image: true,
+            username: true,
           },
         },
         detection: {
@@ -73,25 +131,43 @@ export async function GET(
             price: true,
           },
         },
-        replies: {
-          include: {
-            user: {
-              select: {
-                id: true,
-                name: true,
-                image: true,
-              },
-            },
-          },
-          orderBy: { createdAt: "asc" },
+        _count: {
+          select: { replies: true },
         },
+        replies: buildReplyInclude(4), // Support 5 levels of nesting
       },
-      orderBy: { createdAt: "desc" },
+      orderBy,
     });
+
+    // Get user's votes on these comments
+    const commentIds = extractAllCommentIds(comments);
+    const userVotes = await prisma.patternVote.findMany({
+      where: {
+        userId: session.user.id,
+        commentId: { in: commentIds },
+      },
+      select: {
+        commentId: true,
+        value: true,
+      },
+    });
+
+    // Create vote lookup map
+    const voteMap = new Map(
+      userVotes
+        .filter((v) => v.commentId !== null)
+        .map((v) => [v.commentId as string, v.value])
+    );
+
+    // Attach user votes to comments recursively
+    const commentsWithVotes = attachUserVotes(comments, voteMap);
+
+    // Apply in-memory sorting for "best" and "controversial" (need computed scores)
+    const sortedComments = sortItems(commentsWithVotes, sort);
 
     return NextResponse.json({
       success: true,
-      data: comments,
+      data: sortedComments,
     });
   } catch (error) {
     console.error("Error fetching comments:", error);
@@ -100,6 +176,32 @@ export async function GET(
       { status: 500 }
     );
   }
+}
+
+// Helper to extract all comment IDs recursively
+function extractAllCommentIds(comments: Array<{ id: string; replies?: unknown[] }>): string[] {
+  const ids: string[] = [];
+  for (const comment of comments) {
+    ids.push(comment.id);
+    if (comment.replies && Array.isArray(comment.replies)) {
+      ids.push(...extractAllCommentIds(comment.replies as Array<{ id: string; replies?: unknown[] }>));
+    }
+  }
+  return ids;
+}
+
+// Helper to attach user votes recursively
+function attachUserVotes<T extends { id: string; replies?: unknown[] }>(
+  comments: T[],
+  voteMap: Map<string, number>
+): (T & { userVote: number | null })[] {
+  return comments.map((comment) => ({
+    ...comment,
+    userVote: voteMap.get(comment.id) ?? null,
+    replies: comment.replies
+      ? attachUserVotes(comment.replies as T[], voteMap)
+      : [],
+  }));
 }
 
 // POST /api/sessions/[id]/comments - Create a new comment

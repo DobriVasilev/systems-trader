@@ -15,3 +15,4 @@ export {
 } from "./MentionAutocomplete";
 export { UserHoverCard, useUserHoverCard } from "./UserHoverCard";
 export { UnifiedFeed } from "./UnifiedFeed";
+export { ThreadViewModal } from "./ThreadViewModal";
