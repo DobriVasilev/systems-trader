@@ -115,7 +115,7 @@ export interface PatternConfig {
   category: "price_action" | "support_resistance" | "order_flow" | "fvg" | "supply_demand" | "fibonacci" | "trend" | "classic" | "candlestick" | "volume" | "indicators";
   settings?: PatternSetting[];
   detectionTypes: string[];
-  status?: "ready" | "beta" | "coming_soon"; // Implementation status
+  status?: "validated" | "in_review" | "beta" | "coming_soon"; // Implementation status
 }
 
 // Comprehensive pattern configurations with settings
@@ -127,37 +127,18 @@ export const PATTERN_CONFIGS: Record<PatternType, PatternConfig> = {
     description: "Detect swing highs and swing lows",
     category: "price_action",
     detectionTypes: ["swing_high", "swing_low"],
-    status: "ready",
+    status: "in_review",
     settings: [
       {
         key: "detection_mode",
         label: "Detection Mode",
-        description: "How to identify swing points",
+        description: "Use wicks (high/low) or candle bodies (open/close)",
         type: "select",
         default: "wicks",
         options: [
           { value: "wicks", label: "Wicks (High/Low)" },
           { value: "closes", label: "Candle Bodies (Open/Close)" },
         ],
-      },
-      {
-        key: "lookback",
-        label: "Lookback Period",
-        description: "Number of candles to confirm swing",
-        type: "number",
-        default: 3,
-        min: 1,
-        max: 20,
-      },
-      {
-        key: "min_swing_size",
-        label: "Min Swing Size (%)",
-        description: "Minimum price movement to qualify",
-        type: "number",
-        default: 0,
-        min: 0,
-        max: 10,
-        step: 0.1,
       },
     ],
   },

@@ -344,7 +344,15 @@ export function PatternSelector({
 
 // Status badge component
 function StatusBadge({ status }: { status?: PatternConfig["status"] }) {
-  if (status === "ready") return null; // Don't show badge for ready patterns
+  if (status === "validated") return null; // Don't show badge for validated patterns
+
+  if (status === "in_review") {
+    return (
+      <span className="px-1.5 py-0.5 text-[10px] font-medium bg-blue-500/20 text-blue-400 rounded">
+        REVIEW
+      </span>
+    );
+  }
 
   if (status === "beta") {
     return (
@@ -375,15 +383,16 @@ function PatternOption({
   compact?: boolean;
 }) {
   const category = PATTERN_CATEGORIES[config.category as CategoryKey];
-  const isComingSoon = !config.status || config.status === "coming_soon";
+  // Only disable patterns that are not implemented (coming_soon or no status)
+  const isDisabled = !config.status || config.status === "coming_soon";
 
   return (
     <button
       onClick={onSelect}
-      disabled={isComingSoon}
+      disabled={isDisabled}
       className={`w-full flex items-start gap-2 px-2 py-1.5 rounded text-left
                transition-colors ${isSelected ? "bg-blue-600/20 border border-blue-500/30" : ""}
-               ${isComingSoon ? "opacity-50 cursor-not-allowed" : "hover:bg-gray-800"}`}
+               ${isDisabled ? "opacity-50 cursor-not-allowed" : "hover:bg-gray-800"}`}
     >
       {!compact && (
         <div
@@ -397,7 +406,7 @@ function PatternOption({
             {config.label}
           </span>
           <StatusBadge status={config.status} />
-          {config.settings && config.settings.length > 0 && !isComingSoon && (
+          {config.settings && config.settings.length > 0 && !isDisabled && (
             <svg className="w-3 h-3 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
                 strokeLinecap="round"
