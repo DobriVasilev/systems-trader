@@ -69,11 +69,13 @@ export function CorrectionModal({
   const [structure, setStructure] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [internalMode, setInternalMode] = useState<"delete" | "move" | "add" | "confirm" | "unconfirm">("delete");
+  const [showReasoning, setShowReasoning] = useState(false);
 
   // Reset form when modal opens
   useEffect(() => {
     if (isOpen) {
       setReason("");
+      setShowReasoning(false);
       // Use autoDetectionType from toolbar if available, otherwise fall back to detection type
       if (autoDetectionType && mode === "add") {
         setDetectionType(autoDetectionType);
@@ -216,7 +218,7 @@ export function CorrectionModal({
       />
 
       {/* Modal */}
-      <div className="relative bg-gray-900 rounded-xl shadow-xl border border-gray-800 w-full max-w-md mx-4">
+      <div className={`relative bg-gray-900 rounded-xl shadow-xl border border-gray-800 w-full mx-4 ${showReasoning ? "max-w-2xl" : "max-w-md"}`}>
         <form onSubmit={handleSubmit}>
           {/* Header */}
           <div className="px-6 py-4 border-b border-gray-800">
@@ -229,7 +231,21 @@ export function CorrectionModal({
             {/* Detection info for all modes with detection */}
             {detection && (
               <div className="bg-gray-800 rounded-lg p-3">
-                <div className="text-sm text-gray-400 mb-1">Detection</div>
+                <div className="flex items-center justify-between mb-1">
+                  <div className="text-sm text-gray-400">Detection</div>
+                  {typeof detection.metadata?.fullReasoning === "string" && (
+                    <button
+                      type="button"
+                      onClick={() => setShowReasoning(!showReasoning)}
+                      className="text-xs px-2 py-1 bg-blue-600/20 text-blue-400 rounded hover:bg-blue-600/30 transition-colors flex items-center gap-1"
+                    >
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      {showReasoning ? "Hide" : "View"} Reasoning
+                    </button>
+                  )}
+                </div>
                 <div className="flex items-center gap-2">
                   <div
                     className={`w-3 h-3 rounded-full ${
@@ -251,6 +267,27 @@ export function CorrectionModal({
                 <div className="text-xs text-gray-600 mt-0.5">
                   {new Date(detection.candleTime).toLocaleString()}
                 </div>
+              </div>
+            )}
+
+            {/* Reasoning panel */}
+            {showReasoning && typeof detection?.metadata?.fullReasoning === "string" && (
+              <div className="bg-gray-950 border border-gray-700 rounded-lg p-4 max-h-80 overflow-y-auto">
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="text-sm font-semibold text-white">Algorithm Reasoning</h4>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(detection.metadata?.fullReasoning as string);
+                    }}
+                    className="text-xs px-2 py-1 bg-gray-800 text-gray-400 rounded hover:bg-gray-700 transition-colors"
+                  >
+                    Copy
+                  </button>
+                </div>
+                <pre className="text-xs text-gray-300 font-mono whitespace-pre-wrap leading-relaxed">
+                  {detection.metadata.fullReasoning}
+                </pre>
               </div>
             )}
 
