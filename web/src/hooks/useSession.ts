@@ -21,7 +21,7 @@ export interface PatternDetection {
 export interface PatternCorrection {
   id: string;
   detectionId: string | null;
-  correctionType: "move" | "delete" | "add" | "modify";
+  correctionType: "move" | "delete" | "add" | "modify" | "confirm" | "unconfirm";
   originalData: Record<string, unknown> | null;
   correctedData: Record<string, unknown>;
   reason: string | null;
@@ -71,6 +71,10 @@ export interface PatternSessionDetail {
   symbol: string;
   timeframe: Timeframe;
   patternType: PatternType;
+  patternSettings: {
+    detection_mode?: "wicks" | "closes";
+    [key: string]: unknown;
+  } | null;
   status: "draft" | "active" | "completed" | "archived";
   isPublic: boolean;
   candleData: {

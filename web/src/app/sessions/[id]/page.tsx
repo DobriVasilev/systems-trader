@@ -82,6 +82,9 @@ export default function SessionDetailPage({
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const isOwner = authSession?.user?.id === session?.createdBy?.id;
 
+  // Pattern reasoning modal state
+  const [isPatternReasoningOpen, setIsPatternReasoningOpen] = useState(false);
+
   // Track markers being dragged (to hide original while dragging)
   const [draggingMarkerId, setDraggingMarkerId] = useState<string | null>(null);
   const dragApiCallInProgressRef = useRef(false);
@@ -675,6 +678,16 @@ export default function SessionDetailPage({
             </div>
             <div className="ml-auto flex items-center gap-4">
               <button
+                onClick={() => setIsPatternReasoningOpen(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-blue-900/50 hover:bg-blue-800/50 text-blue-300 rounded-lg transition-colors"
+                title="View algorithm documentation and detection reasoning"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                </svg>
+                Algorithm
+              </button>
+              <button
                 onClick={() => setIsShareModalOpen(true)}
                 className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors"
               >
@@ -840,7 +853,7 @@ export default function SessionDetailPage({
                 </h3>
                 <div className="space-y-3">
                   {session.corrections.map((correction) => (
-                    <div key={correction.id} className="text-sm">
+                    <div key={correction.id} className="text-sm bg-gray-800/50 rounded-lg p-2">
                       <div className="flex items-center gap-2 mb-1">
                         {correction.user.image ? (
                           <img
@@ -855,6 +868,19 @@ export default function SessionDetailPage({
                         <span className="text-gray-600 text-xs">
                           {formatDate(correction.createdAt)}
                         </span>
+                        {correction.detectionId && (
+                          <button
+                            onClick={() => handleNavigateToDetection(correction.detectionId!)}
+                            className="text-xs px-1.5 py-0.5 bg-blue-900/50 text-blue-300 rounded hover:bg-blue-800/50 transition-colors flex items-center gap-1 ml-auto"
+                            title="Go to detection on chart"
+                          >
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                            </svg>
+                            Go to
+                          </button>
+                        )}
                       </div>
                       <div className="ml-6">
                         <span
@@ -864,6 +890,8 @@ export default function SessionDetailPage({
                               delete: "bg-red-900 text-red-300",
                               add: "bg-green-900 text-green-300",
                               modify: "bg-blue-900 text-blue-300",
+                              confirm: "bg-green-900 text-green-300",
+                              unconfirm: "bg-orange-900 text-orange-300",
                             }[correction.correctionType] || "bg-gray-800 text-gray-300"
                           }`}
                         >
@@ -872,6 +900,16 @@ export default function SessionDetailPage({
                         {correction.reason && (
                           <p className="text-gray-400 mt-1">{correction.reason}</p>
                         )}
+                        <button
+                          onClick={() => navigator.clipboard.writeText(correction.id)}
+                          className="text-xs text-gray-600 hover:text-gray-400 mt-1 flex items-center gap-1"
+                          title="Copy correction ID"
+                        >
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                          </svg>
+                          {correction.id.slice(0, 8)}...
+                        </button>
                       </div>
                     </div>
                   ))}
@@ -1070,6 +1108,152 @@ export default function SessionDetailPage({
           isOwner={isOwner}
           isPublic={session.isPublic}
         />
+      )}
+
+      {/* Pattern Reasoning Modal */}
+      {isPatternReasoningOpen && session && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="bg-gray-900 border border-gray-700 rounded-xl shadow-2xl w-full max-w-4xl max-h-[85vh] overflow-hidden flex flex-col">
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-700">
+              <div className="flex items-center gap-3">
+                <svg className="w-6 h-6 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                </svg>
+                <div>
+                  <h2 className="text-lg font-semibold">Pattern Detection Algorithm</h2>
+                  <p className="text-sm text-gray-400">
+                    {session.patternType.replace("_", " ").toUpperCase()} detection • {session.patternSettings?.detection_mode || "wicks"} mode
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsPatternReasoningOpen(false)}
+                className="p-2 hover:bg-gray-800 rounded-lg transition-colors"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto p-6">
+              {/* Algorithm Overview */}
+              <div className="mb-6">
+                <h3 className="text-sm font-semibold text-gray-300 mb-3 flex items-center gap-2">
+                  <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
+                  Algorithm Overview
+                </h3>
+                <div className="bg-gray-800/50 rounded-lg p-4 text-sm font-mono whitespace-pre-wrap text-gray-300 max-h-64 overflow-y-auto">
+{`SWING DETECTION ALGORITHM v1.0
+═══════════════════════════════
+
+OVERVIEW:
+This algorithm detects swing highs and swing lows using a two-phase approach:
+1. PIVOT DETECTION: Find potential swing points by comparing with surrounding candles
+2. CONFIRMATION: Confirm swings only when price "breaks" a significant level
+
+CURRENT SETTINGS:
+• Detection Mode: ${session.patternSettings?.detection_mode === 'closes' ? 'CLOSES (using Close prices only)' : 'WICKS (using High/Low prices)'}
+• Lookback Period: 3 candles before and after
+
+PIVOT DETECTION:
+• SWING HIGH: A candle's ${session.patternSettings?.detection_mode === 'closes' ? 'CLOSE' : 'HIGH'} is HIGHER than all 3 candles before AND after
+• SWING LOW: A candle's ${session.patternSettings?.detection_mode === 'closes' ? 'CLOSE' : 'LOW'} is LOWER than all 3 candles before AND after
+
+CONFIRMATION (Break Logic):
+• Swing LOW confirmed: When price breaks ABOVE previous swing high
+• Swing HIGH confirmed: When price breaks BELOW previous swing low
+
+STRUCTURE LABELS:
+• HH (Higher High): Current high > Previous high → Bullish
+• LH (Lower High): Current high < Previous high → Bearish
+• HL (Higher Low): Current low > Previous low → Bullish
+• LL (Lower Low): Current low < Previous low → Bearish`}
+                </div>
+              </div>
+
+              {/* Detection Summary */}
+              <div className="mb-6">
+                <h3 className="text-sm font-semibold text-gray-300 mb-3 flex items-center gap-2">
+                  <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                  Detection Summary ({session.detections.length} total)
+                </h3>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  {(() => {
+                    const counts: Record<string, number> = {};
+                    session.detections.forEach(d => {
+                      const key = `${d.structure || 'N/A'} (${d.detectionType.replace('swing_', '').toUpperCase()})`;
+                      counts[key] = (counts[key] || 0) + 1;
+                    });
+                    return Object.entries(counts).map(([label, count]) => (
+                      <div key={label} className="bg-gray-800/50 rounded-lg p-3">
+                        <div className="text-2xl font-bold text-blue-400">{count}</div>
+                        <div className="text-xs text-gray-400">{label}</div>
+                      </div>
+                    ));
+                  })()}
+                </div>
+              </div>
+
+              {/* Individual Detections */}
+              <div>
+                <h3 className="text-sm font-semibold text-gray-300 mb-3 flex items-center gap-2">
+                  <span className="w-2 h-2 bg-yellow-500 rounded-full"></span>
+                  Individual Detection Reasoning
+                </h3>
+                <div className="space-y-2 max-h-64 overflow-y-auto">
+                  {session.detections.map((detection, index) => (
+                    <details key={detection.id} className="bg-gray-800/50 rounded-lg">
+                      <summary className="px-4 py-2 cursor-pointer hover:bg-gray-700/50 transition-colors flex items-center gap-3">
+                        <span className={`w-3 h-3 rounded-full ${detection.detectionType.includes('high') ? 'bg-green-500' : 'bg-red-500'}`}></span>
+                        <span className="font-medium">
+                          #{index + 1} {detection.structure || 'N/A'} ({detection.detectionType.replace('swing_', '').toUpperCase()})
+                        </span>
+                        <span className="text-gray-500 text-sm">
+                          @ ${detection.price.toFixed(2)} • Candle #{detection.candleIndex}
+                        </span>
+                        <button
+                          onClick={(e) => {
+                            e.preventDefault();
+                            handleNavigateToDetection(detection.id);
+                            setIsPatternReasoningOpen(false);
+                          }}
+                          className="ml-auto text-xs px-2 py-1 bg-blue-900/50 text-blue-300 rounded hover:bg-blue-800/50"
+                        >
+                          Go to
+                        </button>
+                      </summary>
+                      <div className="px-4 pb-4">
+                        <pre className="text-xs font-mono text-gray-400 whitespace-pre-wrap overflow-x-auto bg-gray-900/50 rounded p-3 mt-2 max-h-48 overflow-y-auto">
+                          {(detection.metadata as { fullReasoning?: string })?.fullReasoning ||
+                           (detection.metadata as { pivotReasoning?: string })?.pivotReasoning ||
+                           'No detailed reasoning available for this detection.'}
+                        </pre>
+                      </div>
+                    </details>
+                  ))}
+                  {session.detections.length === 0 && (
+                    <p className="text-gray-500 text-center py-4">
+                      No detections yet. Run detection to analyze the chart.
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-700">
+              <button
+                onClick={() => setIsPatternReasoningOpen(false)}
+                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </main>
   );
