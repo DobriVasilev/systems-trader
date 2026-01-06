@@ -6,12 +6,8 @@ const HYPERLIQUID_API = "https://api.hyperliquid.xyz/info";
 const NATIVE_INTERVALS = ["1m", "5m", "15m", "30m", "1h", "4h", "1d", "1w", "1M"];
 
 // Mapping for custom intervals: [baseInterval, aggregationFactor]
+// We aggregate smaller native intervals to create custom ones
 const CUSTOM_INTERVAL_MAP: Record<string, [string, number]> = {
-  // Second-based (aggregate from 1m)
-  "1s": ["1m", 1],   // Can't do sub-minute, fallback to 1m
-  "5s": ["1m", 1],
-  "15s": ["1m", 1],
-  "30s": ["1m", 1],
   // Minute-based
   "3m": ["1m", 3],
   "45m": ["15m", 3],
