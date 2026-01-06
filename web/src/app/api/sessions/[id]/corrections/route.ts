@@ -172,10 +172,36 @@ export async function POST(
         data: { status: "confirmed" },
       });
     } else if (correctionType === "move" && detectionId) {
+      // Mark original as moved
       await prisma.patternDetection.update({
         where: { id: detectionId },
         data: { status: "moved" },
       });
+
+      // Create new detection at the moved position
+      if (correctedTime && correctedPrice) {
+        const movedDetection = await prisma.patternDetection.create({
+          data: {
+            id: generateUlid(),
+            sessionId: id,
+            candleIndex: correctedIndex || 0,
+            candleTime: new Date(correctedTime),
+            price: correctedPrice,
+            detectionType: correctedType || originalType || "swing_low",
+            structure: correctedStructure || null,
+            status: "confirmed",
+            metadata: JSON.parse(JSON.stringify({
+              source: "moved",
+              movedFrom: detectionId,
+              movedBy: session.user.id,
+              correctionId: correction.id
+            })),
+          },
+        });
+
+        // Broadcast the new detection
+        await broadcastDetectionUpdated(id, movedDetection.id);
+      }
     }
 
     // If it's an "add" correction, create a new detection

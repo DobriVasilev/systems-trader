@@ -142,8 +142,13 @@ export default function SessionDetailPage({
   const markers: ChartMarker[] = useMemo(() => {
     if (!session?.detections) return [];
 
-    return session.detections.map((d) => {
-      // Determine marker appearance based on detection type
+    // Filter out rejected (deleted) and moved detections
+    const visibleDetections = session.detections.filter(
+      (d) => d.status !== "rejected" && d.status !== "moved"
+    );
+
+    return visibleDetections.map((d) => {
+      // Determine marker appearance based on detection type and status
       let color = "#4a90d9";
       let position: "aboveBar" | "belowBar" = "aboveBar";
       let shape: "circle" | "square" | "arrowUp" | "arrowDown" = "circle";
@@ -156,6 +161,11 @@ export default function SessionDetailPage({
         color = d.detectionType.includes("bos") ? "#ff9800" : d.detectionType.includes("msb") ? "#9c27b0" : "#ef5350"; // Red for lows
         position = "belowBar";
         shape = d.detectionType.includes("bos") || d.detectionType.includes("msb") ? "arrowDown" : "circle";
+      }
+
+      // Confirmed detections show in blue
+      if (d.status === "confirmed") {
+        color = "#2196f3"; // Blue for confirmed
       }
 
       return {
