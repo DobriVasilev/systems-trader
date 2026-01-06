@@ -77,6 +77,10 @@ export default function SessionDetailPage({
   const [movingDetection, setMovingDetection] = useState<PatternDetection | null>(null);
   const [moveTargetData, setMoveTargetData] = useState<{ time: number; price: number; candleIndex: number } | null>(null);
 
+  // Track markers being dragged (to hide original while dragging)
+  const [draggingMarkerId, setDraggingMarkerId] = useState<string | null>(null);
+  const dragApiCallInProgressRef = useRef(false);
+
   // Chart tool state - like TradingView drawing tools
   const [activeTool, setActiveTool] = useState<ChartTool>("select");
 
@@ -165,6 +169,14 @@ export default function SessionDetailPage({
       };
     });
   }, [session?.detections]);
+
+  // Compute hidden marker IDs (markers being moved or dragged)
+  const hiddenMarkerIds = useMemo(() => {
+    const ids: string[] = [];
+    if (movingDetection) ids.push(movingDetection.id);
+    if (draggingMarkerId) ids.push(draggingMarkerId);
+    return ids;
+  }, [movingDetection, draggingMarkerId]);
 
   const isLoading = sessionLoading || (!session?.candleData?.candles && candlesLoading);
 
@@ -270,6 +282,20 @@ export default function SessionDetailPage({
     }
   };
 
+  // Handle drag start (hide original marker while dragging)
+  const handleMarkerDragStart = useCallback((marker: ChartMarker) => {
+    setDraggingMarkerId(marker.id);
+  }, []);
+
+  // Handle drag end (clear dragging state only if drag was cancelled, not if API call is pending)
+  const handleMarkerDragEnd = useCallback(() => {
+    // Only clear if no API call is in progress
+    // handleMarkerDrag will clear it after the API call completes
+    if (!dragApiCallInProgressRef.current) {
+      setDraggingMarkerId(null);
+    }
+  }, []);
+
   // Handle drag-and-drop for markers
   const handleMarkerDrag = useCallback(async (marker: ChartMarker, newTime: number, newPrice: number) => {
     const detection = session?.detections.find((d) => d.id === marker.id);
@@ -278,6 +304,9 @@ export default function SessionDetailPage({
     // Find the candle index for the new position
     const candleIndex = candles.findIndex((c) => c.time === newTime);
     if (candleIndex === -1) return;
+
+    // Mark that API call is in progress (so handleMarkerDragEnd doesn't clear draggingMarkerId)
+    dragApiCallInProgressRef.current = true;
 
     // Submit the move correction directly (without modal for drag)
     try {
@@ -298,6 +327,10 @@ export default function SessionDetailPage({
       await handleCorrectionSubmit(correctionData);
     } catch (err) {
       console.error("Error moving detection:", err);
+    } finally {
+      // Clear dragging state after API call completes (or fails)
+      dragApiCallInProgressRef.current = false;
+      setDraggingMarkerId(null);
     }
   }, [session?.detections, candles]);
 
@@ -573,10 +606,13 @@ export default function SessionDetailPage({
               <CandlestickChart
                 candles={candles}
                 markers={markers}
+                hiddenMarkerIds={hiddenMarkerIds}
                 onCandleClick={handleCandleClick}
                 onMarkerClick={handleMarkerClick}
                 onChartClick={handleChartClick}
+                onMarkerDragStart={handleMarkerDragStart}
                 onMarkerDrag={handleMarkerDrag}
+                onMarkerDragEnd={handleMarkerDragEnd}
                 onMarkerContextMenu={handleMarkerContextMenu}
                 sessionId={id}
                 height={600}
