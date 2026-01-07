@@ -913,24 +913,24 @@ export default function SessionDetailPage({
       )}
 
       {/* Main Content */}
-      <div className="flex flex-1 overflow-hidden">
-        {/* Chart Area */}
-        <div className="flex-1 p-4 overflow-auto">
+      <div className="flex flex-1 overflow-hidden min-h-0">
+        {/* Chart Area - flex column to fill available height */}
+        <div className="flex-1 p-4 flex flex-col overflow-hidden min-h-0">
           {isLoading ? (
-            <div className="flex items-center justify-center h-[600px] bg-gray-900 rounded-lg">
+            <div className="flex-1 flex items-center justify-center bg-gray-900 rounded-lg min-h-0">
               <div className="flex items-center gap-3">
                 <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
                 <span className="text-gray-400">Loading chart data...</span>
               </div>
             </div>
           ) : candles.length === 0 ? (
-            <div className="flex items-center justify-center h-[600px] bg-gray-900 rounded-lg">
+            <div className="flex-1 flex items-center justify-center bg-gray-900 rounded-lg min-h-0">
               <div className="text-gray-500">No candle data available</div>
             </div>
           ) : (
             <div
               ref={chartContainerRef}
-              className="bg-gray-900 rounded-lg overflow-hidden relative"
+              className="flex-1 bg-gray-900 rounded-lg overflow-hidden relative min-h-0"
               onMouseMove={handleMouseMove}
             >
               {/* TradingView-style toolbar */}
@@ -960,15 +960,15 @@ export default function SessionDetailPage({
                 onCandleContextMenu={handleCandleContextMenu}
                 onNavigationComplete={handleNavigationComplete}
                 sessionId={id}
-                height={600}
+                className="h-full"
               />
               {/* Cursor overlay for collaborative editing */}
               <CursorOverlay cursors={cursors} containerRef={chartContainerRef} currentUserId={authSession?.user?.id} />
             </div>
           )}
 
-          {/* Legend */}
-          <div className="mt-4 flex items-center gap-6 text-sm text-gray-400">
+          {/* Legend - fixed height, doesn't grow */}
+          <div className="mt-2 flex items-center gap-6 text-sm text-gray-400 flex-shrink-0">
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 rounded-full bg-green-500" />
               <span>Swing High (1)</span>

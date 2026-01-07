@@ -2,6 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 
+// Helper to check if user is admin
+async function isAdmin(userId: string): Promise<boolean> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { role: true },
+  });
+  return user?.role === "admin";
+}
+
 interface Candle {
   time: number;
   open: number;
@@ -69,16 +78,21 @@ export async function POST(
       );
     }
 
+    // Check if user is admin (admins can access any session)
+    const userIsAdmin = await isAdmin(session.user.id);
+
     // Check session access
     const patternSession = await prisma.patternSession.findFirst({
-      where: {
-        id,
-        OR: [
-          { createdById: session.user.id },
-          { isPublic: true },
-          { shares: { some: { userId: session.user.id } } },
-        ],
-      },
+      where: userIsAdmin
+        ? { id } // Admin: no access restrictions
+        : {
+            id,
+            OR: [
+              { createdById: session.user.id },
+              { isPublic: true },
+              { shares: { some: { userId: session.user.id } } },
+            ],
+          },
       include: {
         detections: {
           where: { candleIndex },
@@ -94,8 +108,10 @@ export async function POST(
       );
     }
 
-    // Parse candle data
-    const candles: Candle[] = JSON.parse(patternSession.candleData as string);
+    // Parse candle data (handle both string and already-parsed object)
+    const candles: Candle[] = typeof patternSession.candleData === "string"
+      ? JSON.parse(patternSession.candleData)
+      : (patternSession.candleData as Candle[]);
 
     if (candleIndex < 0 || candleIndex >= candles.length) {
       return NextResponse.json(

@@ -72,7 +72,7 @@ export function CandlestickChart({
   onCandleContextMenu,
   onNavigationComplete,
   sessionId,
-  height = 500,
+  height,
   className = "",
 }: CandlestickChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -230,14 +230,21 @@ export function CandlestickChart({
     chartRef.current = chart;
     candleSeriesRef.current = candleSeries;
 
-    // Handle resize
+    // Handle resize - now handles both width and height
     const handleResize = () => {
       if (containerRef.current && chartRef.current) {
         chartRef.current.applyOptions({
           width: containerRef.current.clientWidth,
+          height: containerRef.current.clientHeight,
         });
       }
     };
+
+    // Use ResizeObserver for dynamic container size changes
+    const resizeObserver = new ResizeObserver(() => {
+      handleResize();
+    });
+    resizeObserver.observe(containerRef.current);
 
     // Save position before unload
     const handleBeforeUnload = () => {
@@ -257,6 +264,7 @@ export function CandlestickChart({
 
     return () => {
       chart.timeScale().unsubscribeVisibleTimeRangeChange(handleTimeScaleChange);
+      resizeObserver.disconnect();
       window.removeEventListener("resize", handleResize);
       window.removeEventListener("beforeunload", handleBeforeUnload);
       saveChartPosition(); // Save on unmount too
@@ -907,11 +915,10 @@ export function CandlestickChart({
   }, []);
 
   return (
-    <div className="relative">
+    <div className={`relative ${className}`} style={height ? { height } : undefined}>
       <div
         ref={containerRef}
-        className={`w-full ${className} ${draggingMarker ? "cursor-grabbing" : ""} ${isInMoveMode ? "cursor-crosshair" : ""}`}
-        style={{ height }}
+        className={`w-full h-full ${draggingMarker ? "cursor-grabbing" : ""} ${isInMoveMode ? "cursor-crosshair" : ""}`}
         onClick={handleClick}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
