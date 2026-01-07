@@ -111,7 +111,7 @@ export async function POST(
     // Parse candle data (handle both string and already-parsed object)
     const candles: Candle[] = typeof patternSession.candleData === "string"
       ? JSON.parse(patternSession.candleData)
-      : (patternSession.candleData as Candle[]);
+      : (patternSession.candleData as unknown as Candle[]);
 
     if (candleIndex < 0 || candleIndex >= candles.length) {
       return NextResponse.json(

@@ -287,9 +287,9 @@ export default function SessionDetailPage({
   const markers: ChartMarker[] = useMemo(() => {
     if (!session?.detections) return [];
 
-    // Filter out rejected (deleted) and moved detections
+    // Filter out moved detections (they have new positions), but keep rejected (deleted) ones
     const visibleDetections = session.detections.filter(
-      (d) => d.status !== "rejected" && d.status !== "moved"
+      (d) => d.status !== "moved"
     );
 
     return visibleDetections.map((d) => {
@@ -322,10 +322,18 @@ export default function SessionDetailPage({
         color = "#2196f3"; // Blue for confirmed
       }
 
-      // Build the text label - add (C) suffix for close detections
+      // Deleted (rejected) detections show in white/gray
+      if (d.status === "rejected") {
+        color = "#6b7280"; // Gray for deleted
+      }
+
+      // Build the text label - add (C) suffix for close detections, (DEL) for deleted
       let text = d.detectionType.replace("swing_", "").replace("_", " ").toUpperCase();
       if (isCloseDetection) {
         text += " (C)";
+      }
+      if (d.status === "rejected") {
+        text = "✗ " + text; // Add strikethrough indicator
       }
 
       return {
@@ -335,7 +343,7 @@ export default function SessionDetailPage({
         color,
         shape,
         text,
-        size: 1,
+        size: d.status === "rejected" ? 0.5 : 1, // Smaller size for deleted
       };
     });
   }, [session?.detections]);
@@ -984,6 +992,10 @@ export default function SessionDetailPage({
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 rounded-full bg-blue-500" />
               <span>Confirmed</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-gray-500 opacity-60" />
+              <span className="text-gray-500">Deleted</span>
             </div>
             <div className="ml-auto text-gray-500 text-sm">
               Click markers to edit • Press 1/2 to add • M for magnet
