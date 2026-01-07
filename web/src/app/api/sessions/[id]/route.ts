@@ -2,6 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 
+// Helper to check if user is admin
+async function isAdmin(userId: string): Promise<boolean> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { role: true },
+  });
+  return user?.role === "admin";
+}
+
 // GET /api/sessions/[id] - Get a specific session
 export async function GET(
   request: NextRequest,
@@ -18,20 +27,26 @@ export async function GET(
   }
 
   try {
+    // Check if user is admin - admins can access any session
+    const userIsAdmin = await isAdmin(session.user.id);
+
     const patternSession = await prisma.patternSession.findFirst({
-      where: {
-        id,
-        OR: [
-          { createdById: session.user.id },
-          {
-            shares: {
-              some: {
-                userId: session.user.id,
+      where: userIsAdmin
+        ? { id } // Admin: no access restrictions
+        : {
+            id,
+            OR: [
+              { createdById: session.user.id },
+              { isPublic: true },
+              {
+                shares: {
+                  some: {
+                    userId: session.user.id,
+                  },
+                },
               },
-            },
+            ],
           },
-        ],
-      },
       include: {
         createdBy: {
           select: {
@@ -126,22 +141,27 @@ export async function PATCH(
   }
 
   try {
+    // Check if user is admin - admins can edit any session
+    const userIsAdmin = await isAdmin(session.user.id);
+
     // Check ownership or edit permission
     const existingSession = await prisma.patternSession.findFirst({
-      where: {
-        id,
-        OR: [
-          { createdById: session.user.id },
-          {
-            shares: {
-              some: {
-                userId: session.user.id,
-                permission: { in: ["edit", "admin"] },
+      where: userIsAdmin
+        ? { id }
+        : {
+            id,
+            OR: [
+              { createdById: session.user.id },
+              {
+                shares: {
+                  some: {
+                    userId: session.user.id,
+                    permission: { in: ["edit", "admin"] },
+                  },
+                },
               },
-            },
+            ],
           },
-        ],
-      },
     });
 
     if (!existingSession) {
@@ -193,12 +213,17 @@ export async function DELETE(
   }
 
   try {
-    // Only owner can delete
+    // Check if user is admin - admins can delete any session
+    const userIsAdmin = await isAdmin(session.user.id);
+
+    // Only owner or admin can delete
     const existingSession = await prisma.patternSession.findFirst({
-      where: {
-        id,
-        createdById: session.user.id,
-      },
+      where: userIsAdmin
+        ? { id }
+        : {
+            id,
+            createdById: session.user.id,
+          },
     });
 
     if (!existingSession) {
