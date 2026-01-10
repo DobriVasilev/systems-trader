@@ -28,11 +28,11 @@
 ### Phase 3: Trading Dashboard UI
 | Task | Status | Notes |
 |------|--------|-------|
-| Trade entry form | Pending | With real-time validation |
-| Position preview panel | Pending | Shows calculated values |
-| Confirmation modal | Pending | Before execution |
-| Positions list | Pending | Open positions |
-| Orders list | Pending | Pending orders |
+| Trade entry form | DONE | `TradingFormPnl.tsx` with real-time validation |
+| Position preview panel | DONE | Shows qty, margin, liq, R:R in TradingFormPnl |
+| Confirmation modal | DONE | Before execution in TradingFormPnl |
+| Positions list | DONE | Tab-based view in PositionsList |
+| Orders list | DONE | Tab-based view in PositionsList |
 | Trade history | Pending | Past trades |
 
 ### Phase 4: API Integration
@@ -74,6 +74,11 @@
 ### Web App - Trading Logic
 - `/web/src/lib/position-sizing.ts` - DONE - Core PNL-based position sizing
 
+### Web App - Trading UI Components
+- `/web/src/components/trading/TradingFormPnl.tsx` - DONE - PNL-based trading form
+- `/web/src/components/trading/PositionsList.tsx` - UPDATED - Tab-based positions/orders view
+- `/web/src/app/trading/page.tsx` - UPDATED - Uses new TradingFormPnl, tab switcher
+
 ---
 
 ## Key Differences: Tauri vs Web
@@ -90,10 +95,11 @@
 
 ## Current Progress
 
-**Last Updated:** January 10, 2026 - Phase 2 complete
+**Last Updated:** January 10, 2026 - Phase 3 mostly complete
 
-Currently working on: Phase 3 - Building Trading Dashboard UI
+Currently working on: Phase 4 - API Integration
 
 **Completed:**
 - Phase 1: Zustand stores (tradeStore, appStore, settingsStore, exchangeStore)
 - Phase 2: Position sizing logic with PNL verification
+- Phase 3: Trading dashboard UI (TradingFormPnl, PositionsList tabs)

@@ -2,13 +2,14 @@
 
 import { useSession } from "next-auth/react";
 import { redirect } from "next/navigation";
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import Link from "next/link";
 
 import { WalletManager } from "@/components/trading/WalletManager";
 import { AccountOverview } from "@/components/trading/AccountOverview";
-import { TradingForm } from "@/components/trading/TradingForm";
+import { TradingFormPnl } from "@/components/trading/TradingFormPnl";
 import { PositionsList } from "@/components/trading/PositionsList";
+import { useAppStore } from "@/stores/appStore";
 
 interface Wallet {
   id: string;
@@ -51,6 +52,20 @@ interface OpenOrder {
 
 export default function TradingPage() {
   const { data: session, status } = useSession();
+
+  // App store state
+  const {
+    selectedWalletId,
+    walletAddress,
+    tradingEnabled,
+    activeTab,
+    setSelectedWalletId,
+    setWalletAddress,
+    setTradingEnabled,
+    setActiveTab,
+    setError: setAppError,
+    setSuccess: setAppSuccess,
+  } = useAppStore();
 
   const [selectedWallet, setSelectedWallet] = useState<Wallet | null>(null);
   const [password, setPassword] = useState("");
@@ -112,6 +127,10 @@ export default function TradingPage() {
         setOpenOrders(positionsData.openOrders || []);
       }
 
+      // Update app store
+      setSelectedWalletId(selectedWallet.id);
+      setWalletAddress(selectedWallet.address);
+      setTradingEnabled(true);
       setIsUnlocked(true);
     } catch (err) {
       setUnlockError("Network error");
@@ -200,6 +219,7 @@ export default function TradingPage() {
     setPositions([]);
     setOpenOrders([]);
     setUnlockError("");
+    setTradingEnabled(false);
   };
 
   return (
@@ -220,22 +240,33 @@ export default function TradingPage() {
               </span>
             )}
           </div>
-          <div className="flex items-center gap-2">
-            {session.user?.image && (
-              <img
-                src={session.user.image}
-                alt=""
-                className="w-8 h-8 rounded-full"
-              />
+          <div className="flex items-center gap-4">
+            {isUnlocked && (
+              <button
+                onClick={handleRefresh}
+                disabled={isLoadingAccount}
+                className="px-3 py-1.5 text-sm bg-gray-800 hover:bg-gray-700 rounded transition-colors disabled:opacity-50"
+              >
+                {isLoadingAccount ? "Refreshing..." : "Refresh"}
+              </button>
             )}
-            <span className="text-sm text-gray-400">{session.user?.name}</span>
+            <div className="flex items-center gap-2">
+              {session.user?.image && (
+                <img
+                  src={session.user.image}
+                  alt=""
+                  className="w-8 h-8 rounded-full"
+                />
+              )}
+              <span className="text-sm text-gray-400">{session.user?.name}</span>
+            </div>
           </div>
         </div>
       </header>
 
       <main className="max-w-7xl mx-auto px-4 py-6">
         <div className="grid lg:grid-cols-12 gap-6">
-          {/* Left Sidebar - Wallets */}
+          {/* Left Sidebar - Wallets & Account */}
           <div className="lg:col-span-3 space-y-4">
             <WalletManager
               selectedWallet={selectedWallet}
@@ -263,7 +294,7 @@ export default function TradingPage() {
                   <button
                     onClick={handleUnlock}
                     disabled={!password || isLoadingAccount}
-                    className="w-full py-2 bg-blue-600 hover:bg-blue-700 rounded text-sm font-medium disabled:opacity-50"
+                    className="w-full py-2 bg-blue-600 hover:bg-blue-700 rounded text-sm font-medium disabled:opacity-50 transition-colors"
                   >
                     {isLoadingAccount ? "Unlocking..." : "Unlock & Connect"}
                   </button>
@@ -277,17 +308,44 @@ export default function TradingPage() {
             )}
           </div>
 
-          {/* Center - Positions */}
+          {/* Center - Positions & Orders */}
           <div className="lg:col-span-5">
             {isUnlocked ? (
-              <PositionsList
-                walletId={selectedWallet?.id || null}
-                positions={positions}
-                openOrders={openOrders}
-                onRefresh={handleRefresh}
-                onClose={handleClosePosition}
-                onCancelOrder={handleCancelOrder}
-              />
+              <div className="space-y-4">
+                {/* Tab Switcher */}
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setActiveTab("positions")}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      activeTab === "positions"
+                        ? "bg-gray-800 text-white"
+                        : "text-gray-400 hover:text-white"
+                    }`}
+                  >
+                    Positions ({positions.length})
+                  </button>
+                  <button
+                    onClick={() => setActiveTab("orders")}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      activeTab === "orders"
+                        ? "bg-gray-800 text-white"
+                        : "text-gray-400 hover:text-white"
+                    }`}
+                  >
+                    Orders ({openOrders.length})
+                  </button>
+                </div>
+
+                <PositionsList
+                  walletId={selectedWallet?.id || null}
+                  positions={positions}
+                  openOrders={openOrders}
+                  onRefresh={handleRefresh}
+                  onClose={handleClosePosition}
+                  onCancelOrder={handleCancelOrder}
+                  activeTab={activeTab}
+                />
+              </div>
             ) : (
               <div className="bg-gray-900 rounded-xl border border-gray-800 p-8 text-center">
                 <div className="text-gray-500 mb-2">
@@ -304,9 +362,11 @@ export default function TradingPage() {
 
           {/* Right Sidebar - Trading Form */}
           <div className="lg:col-span-4">
-            {isUnlocked ? (
-              <TradingForm
-                walletId={selectedWallet?.id || null}
+            {isUnlocked && selectedWallet ? (
+              <TradingFormPnl
+                walletId={selectedWallet.id}
+                password={password}
+                availableBalance={account?.withdrawable || 0}
                 onTradeComplete={handleRefresh}
               />
             ) : (
@@ -315,7 +375,7 @@ export default function TradingPage() {
                   Unlock wallet to trade
                 </div>
                 <div className="text-xs text-gray-600">
-                  Execute market and limit orders
+                  PNL-based position sizing
                 </div>
               </div>
             )}

@@ -29,6 +29,7 @@ interface PositionsListProps {
   onRefresh: () => void;
   onClose: (symbol: string) => void;
   onCancelOrder: (symbol: string, orderId: number) => void;
+  activeTab: "positions" | "orders" | "history";
 }
 
 export function PositionsList({
@@ -38,6 +39,7 @@ export function PositionsList({
   onRefresh,
   onClose,
   onCancelOrder,
+  activeTab = "positions",
 }: PositionsListProps) {
   const [closingSymbol, setClosingSymbol] = useState<string | null>(null);
   const [cancellingOrder, setCancellingOrder] = useState<number | null>(null);
@@ -61,6 +63,7 @@ export function PositionsList({
   return (
     <div className="space-y-4">
       {/* Positions */}
+      {activeTab === "positions" && (
       <div className="bg-gray-900 rounded-xl border border-gray-800 overflow-hidden">
         <div className="flex items-center justify-between p-4 border-b border-gray-800">
           <div className="flex items-center gap-4">
@@ -183,8 +186,10 @@ export function PositionsList({
           </div>
         )}
       </div>
+      )}
 
       {/* Open Orders */}
+      {activeTab === "orders" && (
       <div className="bg-gray-900 rounded-xl border border-gray-800 overflow-hidden">
         <div className="flex items-center justify-between p-4 border-b border-gray-800">
           <div className="flex items-center gap-4">
@@ -230,6 +235,7 @@ export function PositionsList({
           </div>
         )}
       </div>
+      )}
     </div>
   );
 }
