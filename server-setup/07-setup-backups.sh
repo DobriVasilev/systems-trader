@@ -102,6 +102,19 @@ EOF
 echo "Creating archive..."
 tar -czf "${BACKUP_FILE}" -C "${TMP_DIR}" .
 
+# Encrypt backup if BACKUP_PASSWORD is set
+if [ -n "${BACKUP_PASSWORD:-}" ]; then
+    echo "Encrypting backup with GPG..."
+    gpg --batch --yes --passphrase "${BACKUP_PASSWORD}" --symmetric --cipher-algo AES256 "${BACKUP_FILE}"
+    rm "${BACKUP_FILE}"  # Remove unencrypted version
+    BACKUP_FILE="${BACKUP_FILE}.gpg"
+    BACKUP_FILENAME="${BACKUP_FILENAME}.gpg"
+    echo "Backup encrypted: ${BACKUP_FILE}"
+else
+    echo "WARNING: BACKUP_PASSWORD not set - backup is NOT encrypted!"
+    echo "Add BACKUP_PASSWORD to .env for encrypted backups"
+fi
+
 # Get backup size
 BACKUP_SIZE=$(du -h "${BACKUP_FILE}" | cut -f1)
 echo "Local backup: ${BACKUP_FILE} (${BACKUP_SIZE})"
@@ -197,7 +210,10 @@ echo "  View log:      tail -f /var/log/trading-app/backup.log"
 echo "  List R2 backups: rclone ls r2:\${R2_BUCKET_NAME}/backups/"
 echo ""
 echo "To restore from R2:"
-echo "  1. Download: rclone copy r2:\${R2_BUCKET_NAME}/backups/backup_YYYYMMDD_HHMMSS.tar.gz /tmp/"
-echo "  2. Extract: tar -xzf /tmp/backup_YYYYMMDD_HHMMSS.tar.gz -C /tmp/restore"
-echo "  3. Restore DB: pg_restore -d \"\$DATABASE_URL\" /tmp/restore/database.dump"
-echo "  4. Restore .env if needed"
+echo "  1. Download: rclone copy r2:\${R2_BACKUP_BUCKET}/backups/backup_YYYYMMDD_HHMMSS.tar.gz.gpg /tmp/"
+echo "  2. Decrypt: gpg --decrypt /tmp/backup_*.gpg > /tmp/backup.tar.gz"
+echo "  3. Extract: tar -xzf /tmp/backup.tar.gz -C /tmp/restore"
+echo "  4. Restore DB: pg_restore -d \"\$DATABASE_URL\" /tmp/restore/database.dump"
+echo "  5. Restore .env if needed"
+echo ""
+echo "IMPORTANT: Set BACKUP_PASSWORD in .env for encrypted backups!"
