@@ -74,6 +74,7 @@ model User {
   wallets                UserWallet[]
   botConfigs             BotConfig[]
   trades                 Trade[]
+  extensionKeys          ExtensionKey[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -871,6 +872,7 @@ model UserWallet {
   // Relations
   bots          BotConfig[]
   trades        Trade[]
+  extensionKeys ExtensionKey[]
 
   @@unique([userId, address]) // Can't add same wallet twice
   @@index([userId])
@@ -958,6 +960,7 @@ model Trade {
   closedAt      DateTime?
 
   // Metadata
+  notes         String?  @db.Text // Trade notes (timeframe, source, etc.)
   metadata      Json?    // Additional trade data (signals, patterns, etc.)
 
   @@index([userId, status])
@@ -965,6 +968,40 @@ model Trade {
   @@index([botId])
   @@index([symbol])
   @@index([openedAt])
+}
+
+// Extension API keys for TradingView bridge
+model ExtensionKey {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  walletId      String
+  wallet        UserWallet @relation(fields: [walletId], references: [id], onDelete: Cascade)
+
+  // API Key (hashed for security comparison, or stored encrypted)
+  key           String   @unique // API key for authentication
+  name          String   // "TradingView Chrome Extension"
+
+  // Default trade settings for extension
+  asset         String   @default("BTC")
+  riskAmount    Float    @default(1.0)
+  leverage      Int      @default(25)
+
+  // Wallet password (encrypted, needed for trade execution)
+  walletPassword String? @db.Text // AES encrypted wallet password
+
+  // Usage tracking
+  lastUsedAt    DateTime?
+  usageCount    Int      @default(0)
+
+  // Status
+  active        Boolean  @default(true)
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([userId])
+  @@index([walletId])
 }
 
 // ============================================================================

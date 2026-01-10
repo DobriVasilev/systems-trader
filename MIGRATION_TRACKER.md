@@ -35,20 +35,21 @@
 | Orders list | DONE | Tab-based view in PositionsList |
 | Trade history | Pending | Past trades |
 
-### Phase 4: API Integration
+### Phase 4: API Integration - COMPLETE
 | Task | Status | Notes |
 |------|--------|-------|
-| Wire trade execution | Pending | Entry → SL → TP sequence |
-| Wire position fetching | Pending | Real-time updates |
-| Wire account info | Pending | Balance, margin |
-| Wire price updates | Pending | Live prices |
+| Wire trade execution | DONE | `/api/trade` - Entry → SL → TP sequence |
+| Wire position fetching | DONE | `/api/positions` - Real-time updates |
+| Wire account info | DONE | `/api/account` - Balance, margin |
+| Wire price updates | DONE | `/api/prices` - Live prices every 5s |
 
-### Phase 5: Extension Bridge
+### Phase 5: Extension Bridge - COMPLETE
 | Task | Status | Notes |
 |------|--------|-------|
-| Create /api/extension/settings | Pending | Returns current settings |
-| Create /api/extension/position | Pending | Receives position from TV |
-| Create /api/extension/execute | Pending | Trade execution |
+| Create /api/extension/settings | DONE | Returns/updates settings |
+| Create /api/extension/execute | DONE | PNL-based trade execution |
+| Create /api/extension/keys | DONE | API key management |
+| Add ExtensionKey Prisma model | DONE | schema.prisma updated |
 | Update extension to use web | Pending | Change localhost:3456 to API |
 
 ### Phase 6: Polish & Testing
@@ -79,6 +80,12 @@
 - `/web/src/components/trading/PositionsList.tsx` - UPDATED - Tab-based positions/orders view
 - `/web/src/app/trading/page.tsx` - UPDATED - Uses new TradingFormPnl, tab switcher
 
+### Web App - Extension Bridge API
+- `/web/src/app/api/extension/settings/route.ts` - DONE - GET/POST settings
+- `/web/src/app/api/extension/execute/route.ts` - DONE - Trade execution from extension
+- `/web/src/app/api/extension/keys/route.ts` - DONE - API key management
+- `/web/prisma/schema.prisma` - UPDATED - Added ExtensionKey model
+
 ---
 
 ## Key Differences: Tauri vs Web
@@ -95,11 +102,13 @@
 
 ## Current Progress
 
-**Last Updated:** January 10, 2026 - Phase 3 mostly complete
+**Last Updated:** January 10, 2026 - Phase 5 complete
 
-Currently working on: Phase 4 - API Integration
+Currently working on: Extension update (change localhost to web API)
 
 **Completed:**
 - Phase 1: Zustand stores (tradeStore, appStore, settingsStore, exchangeStore)
 - Phase 2: Position sizing logic with PNL verification
 - Phase 3: Trading dashboard UI (TradingFormPnl, PositionsList tabs)
+- Phase 4: API integration (trade, positions, account, prices)
+- Phase 5: Extension bridge API (settings, execute, keys)
