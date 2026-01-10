@@ -55,7 +55,7 @@
 ### Phase 6: Polish & Testing
 | Task | Status | Notes |
 |------|--------|-------|
-| Settings UI | Pending | Risk settings, etc. |
+| Settings UI | DONE | `/trading/settings` - Extension API key management |
 | Error handling | Pending | User-friendly errors |
 | Loading states | Pending | Proper UX |
 | End-to-end testing | Pending | Full trade flow |
@@ -91,6 +91,9 @@
 - `/extension/content.js` - UPDATED - Uses web API with API key auth
 - `/extension/popup.html` - CREATED - API key configuration popup
 - `/extension/popup.js` - CREATED - Popup logic
+
+### Settings UI
+- `/web/src/app/trading/settings/page.tsx` - Extension API key management
 
 ---
 
