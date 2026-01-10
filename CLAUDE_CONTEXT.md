@@ -194,3 +194,4 @@ journalctl -u trading-app -f
 
 5. **PNL-based sizing is the killer feature.** Fast trade entry because you specify risk, not position size.
 
+# test
