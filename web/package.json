@@ -37,7 +37,8 @@
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "ulid": "^3.0.2",
-    "zod": "^4.3.5"
+    "zod": "^4.3.5",
+    "zustand": "^5.0.9"
   },
   "prisma": {
     "seed": "npx ts-node --compiler-options {\"module\":\"CommonJS\"} prisma/seed.ts"
