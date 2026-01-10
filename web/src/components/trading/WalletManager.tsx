@@ -28,7 +28,8 @@ export function WalletManager({ selectedWallet, onSelectWallet }: WalletManagerP
 
   // Add wallet form state
   const [nickname, setNickname] = useState("");
-  const [privateKey, setPrivateKey] = useState("");
+  const [walletAddress, setWalletAddress] = useState("");
+  const [apiPrivateKey, setApiPrivateKey] = useState("");
   const [password, setPassword] = useState("");
   const [isAdding, setIsAdding] = useState(false);
 
@@ -64,7 +65,12 @@ export function WalletManager({ selectedWallet, onSelectWallet }: WalletManagerP
       const res = await fetch("/api/wallets", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ nickname, privateKey, password }),
+        body: JSON.stringify({
+          nickname,
+          walletAddress,
+          apiPrivateKey,
+          password
+        }),
       });
 
       const data = await res.json();
@@ -78,7 +84,8 @@ export function WalletManager({ selectedWallet, onSelectWallet }: WalletManagerP
       await fetchWallets();
       setShowAddForm(false);
       setNickname("");
-      setPrivateKey("");
+      setWalletAddress("");
+      setApiPrivateKey("");
       setPassword("");
     } catch (err) {
       setError("Network error");
@@ -130,15 +137,28 @@ export function WalletManager({ selectedWallet, onSelectWallet }: WalletManagerP
             />
           </div>
           <div>
-            <label className="block text-xs text-gray-400 mb-1">Private Key</label>
+            <label className="block text-xs text-gray-400 mb-1">Ethereum Wallet Address</label>
             <input
-              type="password"
-              value={privateKey}
-              onChange={(e) => setPrivateKey(e.target.value)}
+              type="text"
+              value={walletAddress}
+              onChange={(e) => setWalletAddress(e.target.value)}
               className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded text-sm font-mono"
               placeholder="0x..."
               required
             />
+            <p className="text-xs text-gray-500 mt-1">Your MetaMask receiving address (same on all EVM networks)</p>
+          </div>
+          <div>
+            <label className="block text-xs text-gray-400 mb-1">API Wallet Private Key</label>
+            <input
+              type="password"
+              value={apiPrivateKey}
+              onChange={(e) => setApiPrivateKey(e.target.value)}
+              className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded text-sm font-mono"
+              placeholder="0x..."
+              required
+            />
+            <p className="text-xs text-gray-500 mt-1">Required for trading. API wallets cannot withdraw.</p>
           </div>
           <div>
             <label className="block text-xs text-gray-400 mb-1">Encryption Password</label>
@@ -151,13 +171,26 @@ export function WalletManager({ selectedWallet, onSelectWallet }: WalletManagerP
               minLength={8}
               required
             />
+            <p className="text-xs text-gray-500 mt-1">Used to encrypt your API key locally</p>
           </div>
+
+          {/* Instructions */}
+          <div className="p-3 bg-gray-900 rounded border border-gray-700">
+            <p className="text-xs font-medium text-gray-300 mb-2">How to get started with Hyperliquid</p>
+            <ul className="text-xs text-gray-500 space-y-1">
+              <li>• Go to app.hyperliquid.xyz</li>
+              <li>• Click your address → API Wallets</li>
+              <li>• Create a new API wallet</li>
+              <li>• Copy the private key</li>
+            </ul>
+          </div>
+
           <button
             type="submit"
             disabled={isAdding}
             className="w-full py-2 bg-blue-600 hover:bg-blue-700 rounded text-sm font-medium disabled:opacity-50"
           >
-            {isAdding ? "Adding..." : "Add Wallet"}
+            {isAdding ? "Adding..." : "Connect to Hyperliquid"}
           </button>
         </form>
       )}

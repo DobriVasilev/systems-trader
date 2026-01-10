@@ -12,7 +12,6 @@ import {
   encryptPrivateKey,
   serializeEncryptedData,
   isValidPrivateKey,
-  getAddressFromPrivateKey,
 } from '@/lib/wallet-encryption';
 
 // Add a new wallet
@@ -24,19 +23,27 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { privateKey, password, nickname } = body;
+    const { walletAddress, apiPrivateKey, password, nickname } = body;
 
     // Validate inputs
-    if (!privateKey || !password || !nickname) {
+    if (!walletAddress || !apiPrivateKey || !password || !nickname) {
       return NextResponse.json(
-        { error: 'Missing required fields: privateKey, password, nickname' },
+        { error: 'Missing required fields: walletAddress, apiPrivateKey, password, nickname' },
         { status: 400 }
       );
     }
 
-    if (!isValidPrivateKey(privateKey)) {
+    // Validate wallet address format
+    if (!/^0x[a-fA-F0-9]{40}$/.test(walletAddress)) {
       return NextResponse.json(
-        { error: 'Invalid private key format. Must be 64 hex characters (with or without 0x prefix)' },
+        { error: 'Invalid wallet address format. Must be 0x followed by 40 hex characters.' },
+        { status: 400 }
+      );
+    }
+
+    if (!isValidPrivateKey(apiPrivateKey)) {
+      return NextResponse.json(
+        { error: 'Invalid API private key format. Must be 64 hex characters (with or without 0x prefix)' },
         { status: 400 }
       );
     }
@@ -48,8 +55,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get wallet address from private key
-    const address = await getAddressFromPrivateKey(privateKey);
+    // Use the provided wallet address (main Hyperliquid wallet)
+    const address = walletAddress;
 
     // Check if wallet already exists for this user
     const existingWallet = await prisma.userWallet.findUnique({
@@ -68,8 +75,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Encrypt the private key
-    const encryptedData = await encryptPrivateKey(privateKey, password);
+    // Encrypt the API private key
+    const encryptedData = await encryptPrivateKey(apiPrivateKey, password);
     const serializedEncryptedKey = serializeEncryptedData(encryptedData);
 
     // Check if this is the user's first wallet (make it default)
@@ -99,7 +106,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       wallet,
-      message: 'Wallet added successfully. Your private key is encrypted and stored securely.',
+      message: 'Wallet connected successfully. Your API key is encrypted and stored securely.',
     });
   } catch (error) {
     console.error('Error adding wallet:', error);
