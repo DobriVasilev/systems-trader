@@ -631,6 +631,160 @@ export class HyperliquidClient {
       return { success: false, error: e instanceof Error ? e.message : String(e) };
     }
   }
+
+  /**
+   * Cancel all open orders
+   */
+  async cancelAllOrders(): Promise<OrderResult> {
+    try {
+      const orders = await this.getOpenOrders();
+      if (orders.length === 0) {
+        return { success: true };
+      }
+
+      const errors: string[] = [];
+      for (const order of orders) {
+        const result = await this.cancelOrder(order.symbol, order.oid);
+        if (!result) {
+          errors.push(`${order.symbol} order ${order.oid}`);
+        }
+      }
+
+      if (errors.length > 0) {
+        return { success: false, error: `Failed to cancel: ${errors.join(", ")}` };
+      }
+      return { success: true };
+    } catch (e) {
+      return { success: false, error: e instanceof Error ? e.message : String(e) };
+    }
+  }
+
+  /**
+   * Withdraw funds to destination address
+   * Note: This requires the MAIN wallet private key, not an API wallet
+   * API wallets cannot withdraw - that's a security feature
+   */
+  async withdrawFunds(destination: string, amount?: string): Promise<OrderResult> {
+    try {
+      // Get available balance
+      const accountInfo = await this.getAccountInfo();
+      const availableBalance = parseFloat(accountInfo.available);
+
+      if (availableBalance <= 1) {
+        return { success: false, error: "Insufficient balance to withdraw (need > $1 for fee)" };
+      }
+
+      // Calculate withdraw amount (leave $1 for fee, or use specified amount)
+      const withdrawAmount = amount
+        ? Math.min(parseFloat(amount), availableBalance - 1)
+        : availableBalance - 1;
+
+      if (withdrawAmount <= 0) {
+        return { success: false, error: "Nothing to withdraw after fees" };
+      }
+
+      const amountStr = withdrawAmount.toFixed(2);
+      const timestamp = Date.now();
+
+      // Build the withdraw action
+      const withdrawAction = {
+        type: "withdraw3",
+        hyperliquidChain: "Mainnet",
+        signatureChainId: "0xa4b1", // Arbitrum chain ID in hex
+        destination: destination,
+        amount: amountStr,
+        time: timestamp,
+      };
+
+      // EIP-712 domain for Arbitrum
+      const WITHDRAW_DOMAIN = {
+        name: "HyperliquidSignTransaction",
+        version: "1",
+        chainId: 42161, // Arbitrum
+        verifyingContract: "0x0000000000000000000000000000000000000000",
+      };
+
+      // Types for withdraw
+      const WITHDRAW_TYPES = {
+        "HyperliquidTransaction:Withdraw": [
+          { name: "hyperliquidChain", type: "string" },
+          { name: "destination", type: "string" },
+          { name: "amount", type: "string" },
+          { name: "time", type: "uint64" },
+        ],
+      };
+
+      // Message to sign
+      const withdrawMessage = {
+        hyperliquidChain: withdrawAction.hyperliquidChain,
+        destination: withdrawAction.destination,
+        amount: withdrawAction.amount,
+        time: withdrawAction.time,
+      };
+
+      const rawSignature = await this.wallet.signTypedData(
+        WITHDRAW_DOMAIN,
+        WITHDRAW_TYPES,
+        withdrawMessage
+      );
+      const { r, s, v } = ethers.Signature.from(rawSignature);
+
+      const requestBody = {
+        action: withdrawAction,
+        nonce: timestamp,
+        signature: { r, s, v },
+      };
+
+      const response = await fetch(MAINNET_EXCHANGE_API, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(requestBody),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        return { success: false, error: `HTTP ${response.status}: ${errorText}` };
+      }
+
+      const result = await response.json();
+
+      if (result.status === "ok") {
+        return {
+          success: true,
+          orderId: timestamp,
+        };
+      } else {
+        return { success: false, error: result.response || JSON.stringify(result) };
+      }
+    } catch (e) {
+      return { success: false, error: e instanceof Error ? e.message : String(e) };
+    }
+  }
+
+  /**
+   * Emergency withdraw - closes positions, cancels orders, withdraws all funds
+   * Note: Requires main wallet key (not API wallet)
+   */
+  async emergencyWithdraw(destination: string, amount?: string): Promise<OrderResult> {
+    try {
+      // Step 1: Cancel all open orders
+      await this.cancelAllOrders();
+
+      // Step 2: Close all positions
+      const closeResult = await this.closeAllPositions();
+      if (!closeResult.success) {
+        console.warn("Some positions may not have closed:", closeResult.error);
+      }
+
+      // Wait a moment for settlements
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      // Step 3: Withdraw funds
+      return await this.withdrawFunds(destination, amount);
+    } catch (e) {
+      return { success: false, error: e instanceof Error ? e.message : String(e) };
+    }
+  }
 }
 
 /**
