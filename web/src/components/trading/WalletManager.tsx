@@ -32,6 +32,7 @@ export function WalletManager({ selectedWallet, onSelectWallet }: WalletManagerP
   const [apiPrivateKey, setApiPrivateKey] = useState("");
   const [password, setPassword] = useState("");
   const [isAdding, setIsAdding] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchWallets();
@@ -91,6 +92,43 @@ export function WalletManager({ selectedWallet, onSelectWallet }: WalletManagerP
       setError("Network error");
     } finally {
       setIsAdding(false);
+    }
+  }
+
+  async function handleDeleteWallet(walletId: string) {
+    if (!confirm("Are you sure you want to delete this wallet?")) {
+      return;
+    }
+
+    setDeletingId(walletId);
+    setError("");
+
+    try {
+      const res = await fetch(`/api/wallets/${walletId}`, {
+        method: "DELETE",
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.error || "Failed to delete wallet");
+        return;
+      }
+
+      // Refresh wallets
+      await fetchWallets();
+
+      // Clear selection if deleted wallet was selected
+      if (selectedWallet?.id === walletId) {
+        const remaining = wallets.filter(w => w.id !== walletId);
+        if (remaining.length > 0) {
+          onSelectWallet(remaining[0]);
+        }
+      }
+    } catch (err) {
+      setError("Network error");
+    } finally {
+      setDeletingId(null);
     }
   }
 
@@ -205,30 +243,44 @@ export function WalletManager({ selectedWallet, onSelectWallet }: WalletManagerP
       ) : (
         <div className="space-y-2">
           {wallets.map((wallet) => (
-            <button
+            <div
               key={wallet.id}
-              onClick={() => onSelectWallet(wallet)}
-              className={`w-full p-3 rounded-lg text-left transition-colors ${
+              className={`p-3 rounded-lg transition-colors ${
                 selectedWallet?.id === wallet.id
                   ? "bg-blue-900/30 border border-blue-700"
                   : "bg-gray-800 hover:bg-gray-750 border border-transparent"
               }`}
             >
-              <div className="flex items-center justify-between">
-                <span className="font-medium text-sm">{wallet.nickname}</span>
-                {wallet.isDefault && (
-                  <span className="text-xs bg-blue-600/30 text-blue-400 px-2 py-0.5 rounded">
-                    Default
-                  </span>
-                )}
-              </div>
-              <div className="text-xs text-gray-500 font-mono mt-1">
-                {wallet.address.slice(0, 6)}...{wallet.address.slice(-4)}
-              </div>
-              <div className="text-xs text-gray-600 mt-1">
-                {wallet._count.trades} trades | {wallet._count.bots} bots
-              </div>
-            </button>
+              <button
+                onClick={() => onSelectWallet(wallet)}
+                className="w-full text-left"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="font-medium text-sm">{wallet.nickname}</span>
+                  {wallet.isDefault && (
+                    <span className="text-xs bg-blue-600/30 text-blue-400 px-2 py-0.5 rounded">
+                      Default
+                    </span>
+                  )}
+                </div>
+                <div className="text-xs text-gray-500 font-mono mt-1">
+                  {wallet.address.slice(0, 6)}...{wallet.address.slice(-4)}
+                </div>
+                <div className="text-xs text-gray-600 mt-1">
+                  {wallet._count.trades} trades | {wallet._count.bots} bots
+                </div>
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleDeleteWallet(wallet.id);
+                }}
+                disabled={deletingId === wallet.id}
+                className="mt-2 text-xs text-red-400 hover:text-red-300 disabled:opacity-50"
+              >
+                {deletingId === wallet.id ? "Deleting..." : "Delete"}
+              </button>
+            </div>
           ))}
         </div>
       )}
