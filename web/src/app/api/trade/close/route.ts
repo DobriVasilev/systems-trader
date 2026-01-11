@@ -7,7 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/db';
-import { getWalletClient } from '@/lib/trading-client';
+import { getWalletClient, isUsingTradingApi, tradingApi } from '@/lib/trading-client';
 
 interface CloseRequest {
   walletId?: string;
@@ -24,19 +24,39 @@ export async function POST(request: NextRequest) {
     const body: CloseRequest = await request.json();
     const { walletId, symbol } = body;
 
-    // Get wallet and client (uses server-side encryption, no password needed)
+    // Get wallet and optionally client
     const { wallet, client } = await getWalletClient(
       session.user.id,
       walletId || null
     );
 
-    let result;
-    if (symbol) {
-      // Close single position
-      result = await client.closePosition(symbol);
+    let result: { success: boolean; error?: string };
+
+    if (isUsingTradingApi()) {
+      // Remote mode: Use Trading API
+      if (symbol) {
+        const apiResult = await tradingApi.closePosition(wallet.encryptedKey, symbol);
+        result = {
+          success: apiResult.success && (apiResult.data?.success ?? false),
+          error: apiResult.error || apiResult.data?.error,
+        };
+      } else {
+        const apiResult = await tradingApi.closeAllPositions(wallet.encryptedKey);
+        result = {
+          success: apiResult.success && (apiResult.data?.success ?? false),
+          error: apiResult.error || apiResult.data?.error,
+        };
+      }
     } else {
-      // Close all positions
-      result = await client.closeAllPositions();
+      // Local mode: Use Hyperliquid client directly
+      if (!client) {
+        return NextResponse.json({ error: 'Client not initialized' }, { status: 500 });
+      }
+      if (symbol) {
+        result = await client.closePosition(symbol);
+      } else {
+        result = await client.closeAllPositions();
+      }
     }
 
     if (!result.success) {

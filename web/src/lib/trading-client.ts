@@ -2,28 +2,34 @@
  * Trading Client Helper
  *
  * Handles wallet decryption and Hyperliquid client creation.
+ * Supports both local mode (direct Hyperliquid) and remote mode (via Trading API).
  */
 
 import { prisma } from '@/lib/db';
 import { deserializeEncryptedData, decryptPrivateKeyServerSide } from '@/lib/wallet-encryption';
 import { HyperliquidClient } from '@/lib/hyperliquid';
+import * as tradingApi from '@/lib/trading-api-client';
+
+// Check if we should use remote trading API (when deployed on Vercel)
+const USE_TRADING_API = Boolean(process.env.TRADING_API_URL && process.env.TRADING_API_KEY);
 
 interface WalletWithClient {
   wallet: {
     id: string;
     address: string;
     nickname: string;
+    encryptedKey: string;
   };
-  client: HyperliquidClient;
+  client: HyperliquidClient | null;
 }
 
 /**
- * Get a wallet and initialized Hyperliquid client
+ * Get a wallet and optionally an initialized Hyperliquid client
  * Uses server-side encryption - no user password needed
  *
  * @param userId - The user's ID
  * @param walletId - The wallet ID (or null for default wallet)
- * @returns The wallet and initialized client
+ * @returns The wallet and initialized client (null if using remote API)
  */
 export async function getWalletClient(
   userId: string,
@@ -46,29 +52,53 @@ export async function getWalletClient(
     throw new Error(walletId ? 'Wallet not found' : 'No default wallet found');
   }
 
-  // Decrypt private key using server-side key
-  const encryptedData = deserializeEncryptedData(wallet.encryptedKey);
-  const privateKey = await decryptPrivateKeyServerSide(encryptedData);
-
-  // Create and initialize client
-  const client = new HyperliquidClient(privateKey);
-  await client.initialize();
-
   // Update last used timestamp
   await prisma.userWallet.update({
     where: { id: wallet.id },
     data: { lastUsedAt: new Date() },
   });
 
+  // If using remote trading API, don't create local client
+  if (USE_TRADING_API) {
+    return {
+      wallet: {
+        id: wallet.id,
+        address: wallet.address,
+        nickname: wallet.nickname,
+        encryptedKey: wallet.encryptedKey,
+      },
+      client: null,
+    };
+  }
+
+  // Local mode: Decrypt private key and create client
+  const encryptedData = deserializeEncryptedData(wallet.encryptedKey);
+  const privateKey = await decryptPrivateKeyServerSide(encryptedData);
+  const client = new HyperliquidClient(privateKey);
+  await client.initialize();
+
   return {
     wallet: {
       id: wallet.id,
       address: wallet.address,
       nickname: wallet.nickname,
+      encryptedKey: wallet.encryptedKey,
     },
     client,
   };
 }
+
+/**
+ * Check if using remote trading API mode
+ */
+export function isUsingTradingApi(): boolean {
+  return USE_TRADING_API;
+}
+
+/**
+ * Get the trading API client for remote operations
+ */
+export { tradingApi };
 
 /**
  * Record a trade in the database

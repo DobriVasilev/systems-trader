@@ -1,12 +1,13 @@
 /**
  * Account API
  *
- * GET /api/account - Get account info (balance, equity, margin)
+ * POST /api/account - Get account info (balance, equity, margin)
+ * Supports both local (direct Hyperliquid) and remote (Trading API) modes
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
-import { getWalletClient } from '@/lib/trading-client';
+import { getWalletClient, isUsingTradingApi, tradingApi } from '@/lib/trading-client';
 
 export async function POST(request: NextRequest) {
   try {
@@ -18,14 +19,31 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { walletId } = body;
 
-    // Get wallet and client (uses server-side encryption, no password needed)
+    // Get wallet and optionally client
     const { wallet, client } = await getWalletClient(
       session.user.id,
       walletId || null
     );
 
-    // Get account info
-    const accountInfo = await client.getAccountInfo();
+    let accountInfo;
+
+    if (isUsingTradingApi()) {
+      // Remote mode: Call trading API
+      const result = await tradingApi.getAccountInfo(wallet.encryptedKey);
+      if (!result.success) {
+        return NextResponse.json(
+          { error: result.error || 'Trading API error' },
+          { status: 500 }
+        );
+      }
+      accountInfo = result.data;
+    } else {
+      // Local mode: Use Hyperliquid client directly
+      if (!client) {
+        return NextResponse.json({ error: 'Client not initialized' }, { status: 500 });
+      }
+      accountInfo = await client.getAccountInfo();
+    }
 
     return NextResponse.json({
       success: true,
