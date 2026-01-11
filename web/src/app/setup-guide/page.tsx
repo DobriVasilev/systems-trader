@@ -27,14 +27,14 @@ export default function SetupGuidePage() {
         </div>
 
         {/* Important Notice */}
-        <div className="mb-8 p-4 bg-yellow-900/20 border border-yellow-700/50 rounded-xl">
+        <div className="mb-8 p-4 bg-amber-900/20 border border-amber-700/50 rounded-xl">
           <div className="flex items-start gap-3">
-            <svg className="w-6 h-6 text-yellow-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-6 h-6 text-amber-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
             </svg>
             <div>
-              <div className="font-semibold text-yellow-400">US Users: VPN Required for Setup Only</div>
-              <p className="text-sm text-yellow-200/70 mt-1">
+              <div className="font-semibold text-amber-400">US Users: VPN Required for Setup Only</div>
+              <p className="text-sm text-amber-200/70 mt-1">
                 Hyperliquid is not available in the US. You&apos;ll need a VPN to create your account initially.
                 After setup, our European server handles all trading - no VPN needed for daily use.
               </p>
@@ -47,7 +47,7 @@ export default function SetupGuidePage() {
           {/* Step 1 - VPN */}
           <div className="bg-gray-900 rounded-xl border border-gray-800 p-6">
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center font-bold">1</div>
+              <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center font-bold text-sm">1</div>
               <h2 className="text-lg font-semibold">Get a Free VPN (US users only)</h2>
             </div>
             <p className="text-gray-400 mb-4">
@@ -57,11 +57,11 @@ export default function SetupGuidePage() {
               href="https://windscribe.com/download"
               target="_blank"
               rel="noopener noreferrer"
-              className="block p-4 bg-gray-800 rounded-lg hover:bg-gray-750 transition-colors mb-4"
+              className="block p-4 bg-gray-800 rounded-lg hover:bg-gray-700 transition-colors mb-4"
             >
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="font-semibold text-blue-400">Windscribe VPN</div>
+                  <div className="font-semibold text-white">Windscribe VPN</div>
                   <div className="text-sm text-gray-500">10GB/month free - more than enough for setup</div>
                 </div>
                 <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -69,13 +69,13 @@ export default function SetupGuidePage() {
                 </svg>
               </div>
             </a>
-            <div className="p-3 bg-blue-900/20 border border-blue-700/50 rounded-lg">
+            <div className="p-3 bg-gray-800 rounded-lg">
               <div className="flex items-start gap-2">
                 <svg className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                <div className="text-sm text-blue-200">
-                  <strong>Important:</strong> After installing Windscribe, connect to <strong>Switzerland</strong> specifically.
+                <div className="text-sm text-gray-300">
+                  After installing, connect to <strong className="text-white">Switzerland</strong> specifically.
                   This has been tested and works reliably with Hyperliquid.
                 </div>
               </div>
@@ -85,7 +85,7 @@ export default function SetupGuidePage() {
           {/* Step 2 - MetaMask */}
           <div className="bg-gray-900 rounded-xl border border-gray-800 p-6">
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center font-bold">2</div>
+              <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center font-bold text-sm">2</div>
               <h2 className="text-lg font-semibold">Create a MetaMask Wallet</h2>
             </div>
             <p className="text-gray-400 mb-4">
@@ -107,20 +107,19 @@ export default function SetupGuidePage() {
               <li>Click &quot;Create a new wallet&quot;</li>
               <li>Create a strong password</li>
               <li>
-                <strong className="text-yellow-400">Write down your 12-word Secret Recovery Phrase</strong> on paper
+                <strong className="text-white">Write down your 12-word Secret Recovery Phrase</strong> on paper
                 and store it safely. This is the ONLY way to recover your wallet!
               </li>
               <li>Confirm the phrase and finish setup</li>
             </ol>
-            <div className="p-3 bg-red-900/20 border border-red-700/50 rounded-lg">
+            <div className="p-3 bg-amber-900/20 border border-amber-700/50 rounded-lg">
               <div className="flex items-start gap-2">
-                <svg className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                 </svg>
-                <div className="text-sm text-red-200">
+                <div className="text-sm text-amber-200">
                   <strong>Save your keys!</strong> Store your MetaMask recovery phrase in a password manager
-                  (KeePass, Apple Passwords, Google Password Manager, 1Password, etc.) or write it on paper.
-                  Never share it with anyone.
+                  or write it on paper. Never share it with anyone.
                 </div>
               </div>
             </div>
@@ -129,7 +128,7 @@ export default function SetupGuidePage() {
           {/* Step 3 - Fund Wallet */}
           <div className="bg-gray-900 rounded-xl border border-gray-800 p-6">
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center font-bold">3</div>
+              <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center font-bold text-sm">3</div>
               <h2 className="text-lg font-semibold">Add Funds to Your Wallet</h2>
             </div>
             <p className="text-gray-400 mb-4">
@@ -138,19 +137,19 @@ export default function SetupGuidePage() {
 
             {/* Option A - Crypto */}
             <div className="mb-4 p-4 bg-gray-800 rounded-lg">
-              <div className="font-semibold text-green-400 mb-2">Option A: Transfer from Exchange (Recommended)</div>
+              <div className="font-semibold text-white mb-2">Option A: Transfer from Exchange (Recommended)</div>
               <ol className="list-decimal list-inside space-y-2 text-gray-300 text-sm">
                 <li>Buy USDC on an exchange (Coinbase, Kraken, Binance, etc.)</li>
                 <li>Copy your MetaMask wallet address (starts with 0x...)</li>
                 <li>Withdraw USDC to your MetaMask address</li>
-                <li><strong className="text-yellow-400">Select &quot;Arbitrum One&quot; network</strong> (lowest fees, ~$0.10)</li>
+                <li><strong className="text-white">Select &quot;Arbitrum One&quot; network</strong> (lowest fees, ~$0.10)</li>
                 <li>Wait 1-5 minutes for confirmation</li>
               </ol>
             </div>
 
             {/* Option B - Fiat */}
             <div className="mb-4 p-4 bg-gray-800 rounded-lg">
-              <div className="font-semibold text-purple-400 mb-2">Option B: Buy Directly with Card</div>
+              <div className="font-semibold text-gray-300 mb-2">Option B: Buy Directly with Card</div>
               <ol className="list-decimal list-inside space-y-2 text-gray-300 text-sm">
                 <li>In MetaMask, click &quot;Buy&quot;</li>
                 <li>Select a provider (MoonPay, Transak, etc.)</li>
@@ -160,13 +159,13 @@ export default function SetupGuidePage() {
               <p className="text-xs text-gray-500 mt-2">Note: Direct purchase has higher fees (~3-5%)</p>
             </div>
 
-            <div className="p-3 bg-green-900/20 border border-green-700/50 rounded-lg">
+            <div className="p-3 bg-gray-800 rounded-lg">
               <div className="flex items-start gap-2">
-                <svg className="w-5 h-5 text-green-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                <svg className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                <div className="text-sm text-green-200">
-                  <strong>How much?</strong> Start with $50-100 USDC while testing.
+                <div className="text-sm text-gray-300">
+                  <strong className="text-white">How much?</strong> Start with $50-100 USDC while testing.
                   You can always add more later. Minimum to trade is ~$10.
                 </div>
               </div>
@@ -176,7 +175,7 @@ export default function SetupGuidePage() {
           {/* Step 4 - Create Hyperliquid Account */}
           <div className="bg-gray-900 rounded-xl border border-gray-800 p-6">
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center font-bold">4</div>
+              <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center font-bold text-sm">4</div>
               <h2 className="text-lg font-semibold">Create Hyperliquid Account</h2>
             </div>
             <p className="text-gray-400 mb-4">
@@ -203,7 +202,7 @@ export default function SetupGuidePage() {
           {/* Step 5 - Deposit to Hyperliquid */}
           <div className="bg-gray-900 rounded-xl border border-gray-800 p-6">
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center font-bold">5</div>
+              <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center font-bold text-sm">5</div>
               <h2 className="text-lg font-semibold">Deposit to Hyperliquid</h2>
             </div>
             <p className="text-gray-400 mb-4">
@@ -211,7 +210,7 @@ export default function SetupGuidePage() {
             </p>
             <ol className="list-decimal list-inside space-y-3 text-gray-300">
               <li>On Hyperliquid, click &quot;Deposit&quot; (or Portfolio → Deposit)</li>
-              <li>Select <strong className="text-yellow-400">&quot;Arbitrum One&quot;</strong> network</li>
+              <li>Select <strong className="text-white">&quot;Arbitrum One&quot;</strong> network</li>
               <li>Enter the amount of USDC to deposit</li>
               <li>Click &quot;Deposit&quot; and confirm in MetaMask</li>
               <li>Wait 1-2 minutes for confirmation</li>
@@ -224,16 +223,16 @@ export default function SetupGuidePage() {
           {/* Step 6 - Create API Wallet */}
           <div className="bg-gray-900 rounded-xl border border-gray-800 p-6">
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-8 h-8 rounded-full bg-purple-600 flex items-center justify-center font-bold">6</div>
+              <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center font-bold text-sm">6</div>
               <h2 className="text-lg font-semibold">Create an API Wallet (Important!)</h2>
             </div>
-            <div className="p-4 bg-purple-900/20 border border-purple-700/50 rounded-lg mb-4">
+            <div className="p-4 bg-gray-800 rounded-lg mb-4">
               <div className="flex items-start gap-2">
-                <svg className="w-5 h-5 text-purple-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                 </svg>
-                <div className="text-sm text-purple-200">
-                  <strong>Why API Wallet?</strong> API wallets can ONLY trade - they cannot withdraw funds.
+                <div className="text-sm text-gray-300">
+                  <strong className="text-white">Why API Wallet?</strong> API wallets can ONLY trade - they cannot withdraw funds.
                   This means even if someone got your API key, they cannot steal your money.
                   Much safer than using your main wallet key!
                 </div>
@@ -241,20 +240,20 @@ export default function SetupGuidePage() {
             </div>
             <ol className="list-decimal list-inside space-y-3 text-gray-300">
               <li>On Hyperliquid, click your wallet address in the top-right corner</li>
-              <li>Select <strong className="text-yellow-400">&quot;API Wallets&quot;</strong></li>
+              <li>Select <strong className="text-white">&quot;API Wallets&quot;</strong></li>
               <li>Click &quot;Generate new API private key&quot;</li>
               <li>
-                <strong className="text-red-400">IMPORTANT:</strong> Copy the private key that appears.
+                <strong className="text-white">IMPORTANT:</strong> Copy the private key that appears.
                 You will only see it once!
               </li>
               <li>Click &quot;Authorize API Wallet&quot; and confirm in MetaMask</li>
             </ol>
-            <div className="mt-4 p-3 bg-red-900/20 border border-red-700/50 rounded-lg">
+            <div className="mt-4 p-3 bg-amber-900/20 border border-amber-700/50 rounded-lg">
               <div className="flex items-start gap-2">
-                <svg className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                 </svg>
-                <div className="text-sm text-red-200">
+                <div className="text-sm text-amber-200">
                   <strong>Save this API key!</strong> Store it in your password manager (KeePass, Apple Passwords,
                   Google Password Manager, 1Password, etc.). You cannot retrieve it again from Hyperliquid.
                 </div>
@@ -265,7 +264,7 @@ export default function SetupGuidePage() {
           {/* Step 7 - Add to Platform */}
           <div className="bg-gray-900 rounded-xl border border-gray-800 p-6">
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-8 h-8 rounded-full bg-green-600 flex items-center justify-center font-bold">7</div>
+              <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center font-bold text-sm">7</div>
               <h2 className="text-lg font-semibold">Add Wallet to Our Platform</h2>
             </div>
             <p className="text-gray-400 mb-4">
@@ -281,19 +280,19 @@ export default function SetupGuidePage() {
               <li>Click &quot;Add Wallet&quot;</li>
               <li>Enter a nickname (e.g., &quot;Main Trading&quot;)</li>
               <li>
-                Paste your <strong className="text-yellow-400">wallet address</strong> (your MetaMask address, starts with 0x...)
+                Paste your <strong className="text-white">wallet address</strong> (your MetaMask address, starts with 0x...)
               </li>
               <li>
-                Paste your <strong className="text-yellow-400">API wallet private key</strong> (from Step 6)
+                Paste your <strong className="text-white">API wallet private key</strong> (from Step 6)
               </li>
               <li>Click &quot;Connect Wallet&quot;</li>
             </ol>
-            <div className="mt-4 p-4 bg-green-900/20 border border-green-700/50 rounded-lg">
+            <div className="mt-4 p-4 bg-gray-800 rounded-lg">
               <div className="flex items-start gap-2">
-                <svg className="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                 </svg>
-                <div className="text-sm text-green-200">
+                <div className="text-sm text-gray-300">
                   Your API key is encrypted with AES-256-GCM before storage and is tied to your account.
                   Only you can access it when logged in.
                 </div>
@@ -302,8 +301,7 @@ export default function SetupGuidePage() {
           </div>
 
           {/* Done */}
-          <div className="bg-gray-900 rounded-xl border border-gray-800 p-6 text-center">
-            <div className="text-4xl mb-4">🎉</div>
+          <div className="bg-blue-900/20 border border-blue-800/50 rounded-xl p-6 text-center">
             <h2 className="text-lg font-semibold mb-2">You&apos;re All Set!</h2>
             <p className="text-gray-400 mb-6">
               You can now trade on Hyperliquid through our platform, set up automated bots,
