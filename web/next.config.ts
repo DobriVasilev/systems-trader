@@ -21,11 +21,12 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-  // Security headers - applied to all routes
+  // Security headers - applied to pages, not static assets
   async headers() {
     return [
       {
-        source: "/:path*",
+        // Exclude _next/static from custom headers (they need correct MIME types)
+        source: "/((?!_next/static|_next/image|favicon.ico).*)",
         headers: [
           // Prevent clickjacking attacks
           { key: "X-Frame-Options", value: "DENY" },
