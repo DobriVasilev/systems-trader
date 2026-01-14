@@ -84,7 +84,8 @@ export function AccountOverview({ account, isLoading }: AccountOverviewProps) {
         <div className="bg-gray-800 rounded-lg p-3">
           <div className="text-xs text-gray-500">Balance</div>
           <div className="font-mono text-sm">
-            ${account.totalRawUsd.toLocaleString(undefined, {
+            ${account.accountValue.toLocaleString(undefined, {
+              minimumFractionDigits: 2,
               maximumFractionDigits: 2,
             })}
           </div>
@@ -93,6 +94,7 @@ export function AccountOverview({ account, isLoading }: AccountOverviewProps) {
           <div className="text-xs text-gray-500">Margin</div>
           <div className="font-mono text-sm">
             ${account.totalMarginUsed.toLocaleString(undefined, {
+              minimumFractionDigits: 2,
               maximumFractionDigits: 2,
             })}
           </div>
@@ -101,6 +103,7 @@ export function AccountOverview({ account, isLoading }: AccountOverviewProps) {
           <div className="text-xs text-gray-500">Withdrawable</div>
           <div className="font-mono text-sm">
             ${account.withdrawable.toLocaleString(undefined, {
+              minimumFractionDigits: 2,
               maximumFractionDigits: 2,
             })}
           </div>
