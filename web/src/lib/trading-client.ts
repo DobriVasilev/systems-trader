@@ -13,12 +13,10 @@ import * as tradingApi from '@/lib/trading-api-client';
 // Check if we should use remote trading API (when deployed on Vercel)
 const USE_TRADING_API = Boolean(process.env.TRADING_API_URL && process.env.TRADING_API_KEY);
 
-// Debug logging
-if (process.env.NODE_ENV === 'production') {
-  console.log('[Trading Client] TRADING_API_URL:', process.env.TRADING_API_URL ? 'SET' : 'NOT SET');
-  console.log('[Trading Client] TRADING_API_KEY:', process.env.TRADING_API_KEY ? 'SET' : 'NOT SET');
-  console.log('[Trading Client] USE_TRADING_API:', USE_TRADING_API);
-}
+// Debug logging (always log)
+console.log('[Trading Client] TRADING_API_URL:', process.env.TRADING_API_URL || 'NOT SET');
+console.log('[Trading Client] TRADING_API_KEY:', process.env.TRADING_API_KEY ? 'SET' : 'NOT SET');
+console.log('[Trading Client] USE_TRADING_API:', USE_TRADING_API);
 
 interface WalletWithClient {
   wallet: {
