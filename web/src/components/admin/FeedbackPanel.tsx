@@ -5,6 +5,8 @@ import { useState, useEffect } from "react";
 interface FeedbackItem {
   id: string;
   type: string;
+  indicator: string | null;
+  customIndicator: string | null;
   title: string | null;
   textContent: string | null;
   voiceTranscription: string | null;
@@ -207,10 +209,15 @@ export function FeedbackPanel() {
                     <div className="flex items-start gap-3 mb-3">
                       <span className="text-2xl">{emoji}</span>
                       <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
+                        <div className="flex items-center gap-2 mb-1 flex-wrap">
                           <span className={`text-xs px-2 py-1 rounded ${colorClass}`}>
                             {item.type.replace("_", " ")}
                           </span>
+                          {item.indicator && (
+                            <span className="text-xs px-2 py-1 rounded bg-blue-900/30 text-blue-400 border border-blue-800">
+                              📊 {item.indicator === "Other" && item.customIndicator ? item.customIndicator : item.indicator}
+                            </span>
+                          )}
                           {item.status === "IMPLEMENTED" && (
                             <span className="text-xs px-2 py-1 rounded bg-green-900/20 text-green-400">
                               ✓ Implemented
@@ -311,13 +318,18 @@ export function FeedbackPanel() {
               {/* Header */}
               <div className="flex items-start justify-between">
                 <div>
-                  <div className="flex items-center gap-2 mb-2">
+                  <div className="flex items-center gap-2 mb-2 flex-wrap">
                     <span className="text-2xl">
                       {FEEDBACK_TYPE_EMOJIS[selectedFeedback.type] || "📝"}
                     </span>
                     <span className={`text-xs px-2 py-1 rounded ${FEEDBACK_TYPE_COLORS[selectedFeedback.type]}`}>
                       {selectedFeedback.type.replace("_", " ")}
                     </span>
+                    {selectedFeedback.indicator && (
+                      <span className="text-xs px-2 py-1 rounded bg-blue-900/30 text-blue-400 border border-blue-800">
+                        📊 {selectedFeedback.indicator === "Other" && selectedFeedback.customIndicator ? selectedFeedback.customIndicator : selectedFeedback.indicator}
+                      </span>
+                    )}
                   </div>
                   {selectedFeedback.title && (
                     <h2 className="text-2xl font-bold text-white mb-2">{selectedFeedback.title}</h2>
