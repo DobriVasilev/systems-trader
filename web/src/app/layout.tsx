@@ -5,6 +5,8 @@ import { ToastProviderWrapper } from "@/components/providers/ToastProviderWrappe
 import { FeedbackProvider } from "@/contexts/FeedbackContext";
 import { FeedbackModal } from "@/components/feedback/FeedbackModal";
 import { FloatingFeedbackWidget } from "@/components/feedback/FloatingFeedbackWidget";
+import { ElementInspector } from "@/components/feedback/ElementInspector";
+import { ConsoleCapture } from "@/components/feedback/ConsoleCapture";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -46,9 +48,11 @@ export default function RootLayout({
       >
         <AuthProvider>
           <FeedbackProvider>
+            <ConsoleCapture />
             <ToastProviderWrapper>{children}</ToastProviderWrapper>
             <FeedbackModal />
             <FloatingFeedbackWidget />
+            <ElementInspector />
           </FeedbackProvider>
         </AuthProvider>
       </body>

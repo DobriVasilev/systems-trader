@@ -212,17 +212,29 @@ export function FeedbackModal() {
         >
           <div className="flex items-center gap-3">
             <div
-              className="w-10 h-10 rounded-full flex items-center justify-center text-xl"
+              className="w-10 h-10 rounded-full flex items-center justify-center text-xl relative"
               style={{ backgroundColor: selectedType?.color }}
             >
               {selectedType?.label.split(" ")[0]}
+              {/* Voice available indicator */}
+              <div
+                className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center shadow-md"
+                style={{
+                  backgroundColor: "#fff",
+                  border: `1.5px solid ${selectedType?.color}`,
+                }}
+              >
+                <svg className="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 20 20" style={{ color: selectedType?.color }}>
+                  <path d="M7 4a3 3 0 016 0v4a3 3 0 01-6 0V4zm4 10.93A7.001 7.001 0 0017 8a1 1 0 10-2 0A5 5 0 015 8a1 1 0 00-2 0 7.001 7.001 0 006 6.93V17H6a1 1 0 100 2h8a1 1 0 100-2h-3v-2.07z" />
+                </svg>
+              </div>
             </div>
             <div>
               <h2 className="text-lg font-semibold" style={{ color: TELEGRAM_COLORS.text }}>
                 Send Feedback
               </h2>
               <p className="text-sm" style={{ color: TELEGRAM_COLORS.hint }}>
-                Help us improve by reporting issues or suggesting features
+                Type or record voice • Alt+Right-click to inspect
               </p>
             </div>
           </div>
@@ -410,65 +422,28 @@ export function FeedbackModal() {
             </div>
           )}
 
-          {/* Additional Details (for bug reports) */}
+          {/* Additional Details (for bug reports) - Simplified */}
           {formData.type === "BUG_REPORT" && (
-            <>
-              <div>
-                <label className="block text-sm font-medium mb-2" style={{ color: TELEGRAM_COLORS.text }}>
-                  Steps to Reproduce (Optional)
-                </label>
-                <textarea
-                  value={formData.stepsToReproduce}
-                  onChange={(e) => setFormData({ ...formData, stepsToReproduce: e.target.value })}
-                  placeholder="1. Go to...\n2. Click on...\n3. See error"
-                  rows={3}
-                  className="w-full px-4 py-3 rounded-lg resize-none focus:outline-none"
-                  style={{
-                    backgroundColor: TELEGRAM_COLORS.secondaryBg,
-                    border: `1px solid ${TELEGRAM_COLORS.border}`,
-                    color: TELEGRAM_COLORS.text,
-                  }}
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium mb-2" style={{ color: TELEGRAM_COLORS.text }}>
-                    Expected Behavior
-                  </label>
-                  <textarea
-                    value={formData.expectedBehavior}
-                    onChange={(e) => setFormData({ ...formData, expectedBehavior: e.target.value })}
-                    placeholder="What should happen?"
-                    rows={3}
-                    className="w-full px-4 py-3 rounded-lg resize-none focus:outline-none"
-                    style={{
-                      backgroundColor: TELEGRAM_COLORS.secondaryBg,
-                      border: `1px solid ${TELEGRAM_COLORS.border}`,
-                      color: TELEGRAM_COLORS.text,
-                    }}
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium mb-2" style={{ color: TELEGRAM_COLORS.text }}>
-                    Actual Behavior
-                  </label>
-                  <textarea
-                    value={formData.actualBehavior}
-                    onChange={(e) => setFormData({ ...formData, actualBehavior: e.target.value })}
-                    placeholder="What actually happens?"
-                    rows={3}
-                    className="w-full px-4 py-3 rounded-lg resize-none focus:outline-none"
-                    style={{
-                      backgroundColor: TELEGRAM_COLORS.secondaryBg,
-                      border: `1px solid ${TELEGRAM_COLORS.border}`,
-                      color: TELEGRAM_COLORS.text,
-                    }}
-                  />
-                </div>
-              </div>
-            </>
+            <div>
+              <label className="block text-sm font-medium mb-2" style={{ color: TELEGRAM_COLORS.text }}>
+                Additional Details (Optional)
+                <span style={{ color: TELEGRAM_COLORS.hint, fontSize: '12px', marginLeft: '8px' }}>
+                  You can also record this with voice 🎤
+                </span>
+              </label>
+              <textarea
+                value={formData.stepsToReproduce}
+                onChange={(e) => setFormData({ ...formData, stepsToReproduce: e.target.value })}
+                placeholder="Tell us more about what happened:\n• Steps to reproduce\n• What you expected\n• What actually happened"
+                rows={4}
+                className="w-full px-4 py-3 rounded-lg resize-none focus:outline-none"
+                style={{
+                  backgroundColor: TELEGRAM_COLORS.secondaryBg,
+                  border: `1px solid ${TELEGRAM_COLORS.border}`,
+                  color: TELEGRAM_COLORS.text,
+                }}
+              />
+            </div>
           )}
 
           {/* Screenshots */}

@@ -9,6 +9,14 @@ interface FeedbackContextData {
   clickX?: number;
   clickY?: number;
   selectedElement?: string;
+  element?: {
+    tag: string;
+    id: string;
+    classes: string[];
+    selector: string;
+  };
+  consoleLogs?: any[];
+  screenshot?: string | null;
 }
 
 interface FeedbackContextType {
@@ -107,37 +115,37 @@ export function FeedbackProvider({ children }: FeedbackProviderProps) {
     setIsMinimized(false);
   }, []);
 
-  // Global right-click handler
-  useEffect(() => {
-    if (!session?.user) return;
+  // Global right-click handler (disabled - ElementInspector handles Alt+Right-click now)
+  // useEffect(() => {
+  //   if (!session?.user) return;
 
-    const handleContextMenu = (event: MouseEvent) => {
-      // Don't override right-click on text inputs, textareas, or contenteditable
-      const target = event.target as HTMLElement;
-      if (
-        target.tagName === "INPUT" ||
-        target.tagName === "TEXTAREA" ||
-        target.isContentEditable
-      ) {
-        return;
-      }
+  //   const handleContextMenu = (event: MouseEvent) => {
+  //     // Don't override right-click on text inputs, textareas, or contenteditable
+  //     const target = event.target as HTMLElement;
+  //     if (
+  //       target.tagName === "INPUT" ||
+  //       target.tagName === "TEXTAREA" ||
+  //       target.isContentEditable
+  //     ) {
+  //       return;
+  //     }
 
-      // Check if Alt/Option key is pressed for feedback
-      if (event.altKey) {
-        event.preventDefault();
-        event.stopPropagation();
+  //     // Check if Alt/Option key is pressed for feedback
+  //     if (event.altKey) {
+  //       event.preventDefault();
+  //       event.stopPropagation();
 
-        const data = captureContext(event);
-        openFeedback(data);
-      }
-    };
+  //       const data = captureContext(event);
+  //       openFeedback(data);
+  //     }
+  //   };
 
-    document.addEventListener("contextmenu", handleContextMenu, true);
+  //   document.addEventListener("contextmenu", handleContextMenu, true);
 
-    return () => {
-      document.removeEventListener("contextmenu", handleContextMenu, true);
-    };
-  }, [session, captureContext, openFeedback]);
+  //   return () => {
+  //     document.removeEventListener("contextmenu", handleContextMenu, true);
+  //   };
+  // }, [session, captureContext, openFeedback]);
 
   // Keyboard shortcut: Alt + F to open feedback
   useEffect(() => {
