@@ -2125,11 +2125,23 @@ function ChatPageContent() {
                   borderTop: `1px solid ${TELEGRAM_COLORS.border}`,
                 }}
               >
-                <div className="flex items-end gap-2">
+                <div className="flex items-end gap-2 relative">
+                  {/* Emoji button */}
+                  <button
+                    onClick={() => setShowInputEmoji(!showInputEmoji)}
+                    className="p-3 rounded-full transition-colors hover:opacity-80"
+                    style={{ color: TELEGRAM_COLORS.hint }}
+                    title="Emoji"
+                  >
+                    <svg className="w-6 h-6" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-5-6c.78 2.34 2.72 4 5 4s4.22-1.66 5-4H7zm8-4c.55 0 1-.45 1-1s-.45-1-1-1-1 .45-1 1 .45 1 1 1zm-6 0c.55 0 1-.45 1-1s-.45-1-1-1-1 .45-1 1 .45 1 1 1z"/>
+                    </svg>
+                  </button>
+
                   <textarea
                     ref={inputRef}
                     value={inputValue}
-                    onChange={(e) => setInputValue(e.target.value)}
+                    onChange={handleInputChange}
                     onKeyDown={(e) => {
                       if (e.key === "Enter" && !e.shiftKey) {
                         e.preventDefault();
@@ -2138,27 +2150,87 @@ function ChatPageContent() {
                     }}
                     placeholder="Type a message..."
                     rows={1}
-                    className="flex-1 px-4 py-3 rounded-2xl resize-none focus:outline-none"
+                    className="flex-1 px-4 py-3 rounded-2xl resize-none max-h-32 focus:outline-none"
                     style={{
                       backgroundColor: TELEGRAM_COLORS.inputBg,
                       border: `1px solid ${TELEGRAM_COLORS.border}`,
                       color: TELEGRAM_COLORS.text,
+                      minHeight: "48px",
                     }}
                   />
-                  <button
-                    onClick={sendDM}
-                    disabled={!inputValue.trim() || isSending}
-                    className="p-3 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    style={{
-                      backgroundColor: TELEGRAM_COLORS.primary,
-                      color: TELEGRAM_COLORS.buttonText,
-                    }}
-                  >
-                    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
-                    </svg>
-                  </button>
+
+                  {/* Voice recorder or Send button */}
+                  {!inputValue.trim() ? (
+                    <VoiceRecorder
+                      onSend={async (audioBlob, duration) => {
+                        try {
+                          // Upload voice file
+                          const formData = new FormData();
+                          formData.append("file", audioBlob, "voice-message.webm");
+
+                          const uploadRes = await fetch("/api/chat/upload", {
+                            method: "POST",
+                            body: formData,
+                          });
+                          const uploadData = await uploadRes.json();
+
+                          if (uploadData.success) {
+                            // Send DM with voice attachment
+                            await fetch("/api/chat/direct-messages", {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({
+                                recipientId: selectedDM,
+                                content: "[Voice message]",
+                                voiceAttachmentId: uploadData.data.attachmentId,
+                                voiceDuration: duration,
+                              }),
+                            });
+                          }
+                        } catch (error) {
+                          console.error("Error sending voice DM:", error);
+                          alert("Failed to send voice message. Please check microphone permissions.");
+                        }
+                      }}
+                      onCancel={() => {
+                        // Voice recording cancelled
+                      }}
+                    />
+                  ) : (
+                    <button
+                      onClick={sendDM}
+                      disabled={!inputValue.trim() || isSending}
+                      className="p-3 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      style={{
+                        backgroundColor: TELEGRAM_COLORS.primary,
+                        color: TELEGRAM_COLORS.buttonText,
+                      }}
+                    >
+                      {isSending ? (
+                        <div
+                          className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"
+                        />
+                      ) : (
+                        <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                          <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
+                        </svg>
+                      )}
+                    </button>
+                  )}
                 </div>
+
+                {/* Emoji Picker for DMs */}
+                <EmojiPicker
+                  isOpen={showInputEmoji}
+                  onClose={() => setShowInputEmoji(false)}
+                  onEmojiSelect={(emoji) => {
+                    setInputValue((prev) => prev + emoji);
+                    inputRef.current?.focus();
+                  }}
+                  onGifSelect={(gifUrl) => {
+                    setShowInputEmoji(false);
+                  }}
+                />
               </div>
             </>
           ) : (
