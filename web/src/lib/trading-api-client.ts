@@ -56,18 +56,18 @@ export async function encryptWalletKey(privateKey: string) {
 
 // ============= Account Operations =============
 
-export async function getAccountInfo(encryptedKey: string) {
+export async function getAccountInfo(encryptedKey: string, address?: string) {
   return callTradingApi<{
     balance: string;
     available: string;
     totalMarginUsed: string;
     totalPositionValue: string;
-  }>("/account", "POST", { encryptedKey });
+  }>("/account", "POST", { encryptedKey, address });
 }
 
 // ============= Position Operations =============
 
-export async function getPositions(encryptedKey: string) {
+export async function getPositions(encryptedKey: string, address?: string) {
   return callTradingApi<
     Array<{
       symbol: string;
@@ -78,10 +78,10 @@ export async function getPositions(encryptedKey: string) {
       liquidationPrice: string;
       side: "long" | "short";
     }>
-  >("/positions", "POST", { encryptedKey });
+  >("/positions", "POST", { encryptedKey, address });
 }
 
-export async function getOpenOrders(encryptedKey: string) {
+export async function getOpenOrders(encryptedKey: string, address?: string) {
   return callTradingApi<
     Array<{
       symbol: string;
@@ -92,13 +92,14 @@ export async function getOpenOrders(encryptedKey: string) {
       timestamp: number;
       oid: number;
     }>
-  >("/orders", "POST", { encryptedKey });
+  >("/orders", "POST", { encryptedKey, address });
 }
 
 // ============= Trade Operations =============
 
 export interface PlaceOrderParams {
   encryptedKey: string;
+  address?: string;
   asset: string;
   isBuy: boolean;
   price: number;
@@ -123,54 +124,63 @@ export async function placeMarketOrder(
   encryptedKey: string,
   asset: string,
   isBuy: boolean,
-  size: number
+  size: number,
+  address?: string
 ) {
   return callTradingApi<OrderResult>("/trade/market", "POST", {
     encryptedKey,
+    address,
     asset,
     isBuy,
     size,
   });
 }
 
-export async function closePosition(encryptedKey: string, asset: string) {
+export async function closePosition(encryptedKey: string, asset: string, address?: string) {
   return callTradingApi<OrderResult>("/trade/close", "POST", {
     encryptedKey,
+    address,
     asset,
   });
 }
 
-export async function closeAllPositions(encryptedKey: string) {
+export async function closeAllPositions(encryptedKey: string, address?: string) {
   return callTradingApi<OrderResult>("/trade/close-all", "POST", {
     encryptedKey,
+    address,
   });
 }
 
 export async function cancelOrder(
   encryptedKey: string,
   asset: string,
-  orderId: number
+  orderId: number,
+  address?: string
 ) {
   return callTradingApi<{ success: boolean }>("/trade/cancel", "POST", {
     encryptedKey,
+    address,
     asset,
     orderId,
   });
 }
 
-export async function cancelAllOrders(encryptedKey: string) {
+export async function cancelAllOrders(encryptedKey: string, address?: string) {
   return callTradingApi<OrderResult>("/trade/cancel-all", "POST", {
     encryptedKey,
+    address,
   });
 }
 
 export async function setLeverage(
   encryptedKey: string,
   asset: string,
-  leverage: number
+  leverage: number,
+  address?: string
 ) {
   return callTradingApi<{ success: boolean }>("/leverage", "POST", {
     encryptedKey,
+    address,
     asset,
     leverage,
   });
@@ -181,10 +191,12 @@ export async function placeStopLoss(
   asset: string,
   isLong: boolean,
   size: number,
-  triggerPrice: number
+  triggerPrice: number,
+  address?: string
 ) {
   return callTradingApi<OrderResult>("/trade/stop-loss", "POST", {
     encryptedKey,
+    address,
     asset,
     isLong,
     size,
@@ -197,10 +209,12 @@ export async function placeTakeProfit(
   asset: string,
   isLong: boolean,
   size: number,
-  triggerPrice: number
+  triggerPrice: number,
+  address?: string
 ) {
   return callTradingApi<OrderResult>("/trade/take-profit", "POST", {
     encryptedKey,
+    address,
     asset,
     isLong,
     size,
@@ -211,10 +225,12 @@ export async function placeTakeProfit(
 export async function withdrawFunds(
   encryptedKey: string,
   destination: string,
-  amount?: string
+  amount?: string,
+  address?: string
 ) {
   return callTradingApi<OrderResult>("/withdraw", "POST", {
     encryptedKey,
+    address,
     destination,
     amount,
   });
@@ -223,10 +239,12 @@ export async function withdrawFunds(
 export async function emergencyWithdraw(
   encryptedKey: string,
   destination: string,
-  amount?: string
+  amount?: string,
+  address?: string
 ) {
   return callTradingApi<OrderResult>("/emergency-withdraw", "POST", {
     encryptedKey,
+    address,
     destination,
     amount,
   });

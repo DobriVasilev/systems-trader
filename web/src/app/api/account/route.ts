@@ -28,8 +28,8 @@ export async function POST(request: NextRequest) {
     let rawAccountInfo;
 
     if (isUsingTradingApi()) {
-      // Remote mode: Call trading API
-      const result = await tradingApi.getAccountInfo(wallet.encryptedKey);
+      // Remote mode: Call trading API with wallet address
+      const result = await tradingApi.getAccountInfo(wallet.encryptedKey, wallet.address);
       if (!result.success) {
         return NextResponse.json(
           { error: result.error || 'Trading API error' },

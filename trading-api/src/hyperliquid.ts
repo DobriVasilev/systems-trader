@@ -199,11 +199,12 @@ export class HyperliquidClient {
   private assetDecimals: Map<string, number> = new Map();
   private initialized: boolean = false;
 
-  constructor(privateKey: string) {
+  constructor(privateKey: string, mainWalletAddress?: string) {
     // Ensure key has 0x prefix
     const formattedKey = privateKey.startsWith("0x") ? privateKey : `0x${privateKey}`;
     this.wallet = new ethers.Wallet(formattedKey);
-    this.walletAddress = this.wallet.address;
+    // Use provided main wallet address, or derive from private key
+    this.walletAddress = mainWalletAddress || this.wallet.address;
   }
 
   /**
@@ -846,6 +847,6 @@ export class HyperliquidClient {
 /**
  * Create a Hyperliquid client from a private key
  */
-export function createHyperliquidClient(privateKey: string): HyperliquidClient {
-  return new HyperliquidClient(privateKey);
+export function createHyperliquidClient(privateKey: string, mainWalletAddress?: string): HyperliquidClient {
+  return new HyperliquidClient(privateKey, mainWalletAddress);
 }

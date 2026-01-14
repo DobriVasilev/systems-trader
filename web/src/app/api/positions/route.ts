@@ -28,10 +28,10 @@ export async function POST(request: NextRequest) {
     let positions, openOrders;
 
     if (isUsingTradingApi()) {
-      // Remote mode: Call trading API
+      // Remote mode: Call trading API with wallet address
       const [positionsResult, ordersResult] = await Promise.all([
-        tradingApi.getPositions(wallet.encryptedKey),
-        tradingApi.getOpenOrders(wallet.encryptedKey),
+        tradingApi.getPositions(wallet.encryptedKey, wallet.address),
+        tradingApi.getOpenOrders(wallet.encryptedKey, wallet.address),
       ]);
 
       if (!positionsResult.success || !ordersResult.success) {

@@ -91,7 +91,7 @@ app.post("/wallets/encrypt", async (req, res) => {
 // Get account info for a wallet
 app.post("/account", async (req, res) => {
   try {
-    const { encryptedKey } = req.body;
+    const { encryptedKey, address } = req.body;
 
     if (!encryptedKey) {
       res.status(400).json({ error: "Missing encryptedKey" });
@@ -101,7 +101,7 @@ app.post("/account", async (req, res) => {
     const privateKey = await decryptPrivateKeyServerSide(
       deserializeEncryptedData(encryptedKey)
     );
-    const client = createHyperliquidClient(privateKey);
+    const client = createHyperliquidClient(privateKey, address);
     const accountInfo = await client.getAccountInfo();
 
     res.json(accountInfo);
@@ -116,7 +116,7 @@ app.post("/account", async (req, res) => {
 // Get positions for a wallet
 app.post("/positions", async (req, res) => {
   try {
-    const { encryptedKey } = req.body;
+    const { encryptedKey, address } = req.body;
 
     if (!encryptedKey) {
       res.status(400).json({ error: "Missing encryptedKey" });
@@ -126,7 +126,7 @@ app.post("/positions", async (req, res) => {
     const privateKey = await decryptPrivateKeyServerSide(
       deserializeEncryptedData(encryptedKey)
     );
-    const client = createHyperliquidClient(privateKey);
+    const client = createHyperliquidClient(privateKey, address);
     const positions = await client.getPositions();
 
     res.json(positions);
@@ -139,7 +139,7 @@ app.post("/positions", async (req, res) => {
 // Get open orders
 app.post("/orders", async (req, res) => {
   try {
-    const { encryptedKey } = req.body;
+    const { encryptedKey, address } = req.body;
 
     if (!encryptedKey) {
       res.status(400).json({ error: "Missing encryptedKey" });
@@ -149,7 +149,7 @@ app.post("/orders", async (req, res) => {
     const privateKey = await decryptPrivateKeyServerSide(
       deserializeEncryptedData(encryptedKey)
     );
-    const client = createHyperliquidClient(privateKey);
+    const client = createHyperliquidClient(privateKey, address);
     const orders = await client.getOpenOrders();
 
     res.json(orders);
@@ -164,7 +164,7 @@ app.post("/orders", async (req, res) => {
 // Place an order
 app.post("/trade", async (req, res) => {
   try {
-    const { encryptedKey, asset, isBuy, price, size, reduceOnly, postOnly } =
+    const { encryptedKey, address, asset, isBuy, price, size, reduceOnly, postOnly } =
       req.body;
 
     if (!encryptedKey || !asset || isBuy === undefined || !price || !size) {
@@ -175,7 +175,7 @@ app.post("/trade", async (req, res) => {
     const privateKey = await decryptPrivateKeyServerSide(
       deserializeEncryptedData(encryptedKey)
     );
-    const client = createHyperliquidClient(privateKey);
+    const client = createHyperliquidClient(privateKey, address);
     const result = await client.placeOrder({
       asset,
       isBuy,
@@ -195,7 +195,7 @@ app.post("/trade", async (req, res) => {
 // Place a market order
 app.post("/trade/market", async (req, res) => {
   try {
-    const { encryptedKey, asset, isBuy, size } = req.body;
+    const { encryptedKey, address, asset, isBuy, size } = req.body;
 
     if (!encryptedKey || !asset || isBuy === undefined || !size) {
       res.status(400).json({ error: "Missing required fields" });
@@ -205,7 +205,7 @@ app.post("/trade/market", async (req, res) => {
     const privateKey = await decryptPrivateKeyServerSide(
       deserializeEncryptedData(encryptedKey)
     );
-    const client = createHyperliquidClient(privateKey);
+    const client = createHyperliquidClient(privateKey, address);
     const result = await client.placeMarketOrder(asset, isBuy, size);
 
     res.json(result);
@@ -218,7 +218,7 @@ app.post("/trade/market", async (req, res) => {
 // Close a position
 app.post("/trade/close", async (req, res) => {
   try {
-    const { encryptedKey, asset } = req.body;
+    const { encryptedKey, address, asset } = req.body;
 
     if (!encryptedKey || !asset) {
       res.status(400).json({ error: "Missing required fields" });
@@ -228,7 +228,7 @@ app.post("/trade/close", async (req, res) => {
     const privateKey = await decryptPrivateKeyServerSide(
       deserializeEncryptedData(encryptedKey)
     );
-    const client = createHyperliquidClient(privateKey);
+    const client = createHyperliquidClient(privateKey, address);
     const result = await client.closePosition(asset);
 
     res.json(result);
@@ -241,7 +241,7 @@ app.post("/trade/close", async (req, res) => {
 // Close all positions
 app.post("/trade/close-all", async (req, res) => {
   try {
-    const { encryptedKey } = req.body;
+    const { encryptedKey, address } = req.body;
 
     if (!encryptedKey) {
       res.status(400).json({ error: "Missing encryptedKey" });
@@ -251,7 +251,7 @@ app.post("/trade/close-all", async (req, res) => {
     const privateKey = await decryptPrivateKeyServerSide(
       deserializeEncryptedData(encryptedKey)
     );
-    const client = createHyperliquidClient(privateKey);
+    const client = createHyperliquidClient(privateKey, address);
     const result = await client.closeAllPositions();
 
     res.json(result);
@@ -264,7 +264,7 @@ app.post("/trade/close-all", async (req, res) => {
 // Cancel an order
 app.post("/trade/cancel", async (req, res) => {
   try {
-    const { encryptedKey, asset, orderId } = req.body;
+    const { encryptedKey, address, asset, orderId } = req.body;
 
     if (!encryptedKey || !asset || !orderId) {
       res.status(400).json({ error: "Missing required fields" });
@@ -274,7 +274,7 @@ app.post("/trade/cancel", async (req, res) => {
     const privateKey = await decryptPrivateKeyServerSide(
       deserializeEncryptedData(encryptedKey)
     );
-    const client = createHyperliquidClient(privateKey);
+    const client = createHyperliquidClient(privateKey, address);
     const success = await client.cancelOrder(asset, orderId);
 
     res.json({ success });
@@ -287,7 +287,7 @@ app.post("/trade/cancel", async (req, res) => {
 // Cancel all orders
 app.post("/trade/cancel-all", async (req, res) => {
   try {
-    const { encryptedKey } = req.body;
+    const { encryptedKey, address } = req.body;
 
     if (!encryptedKey) {
       res.status(400).json({ error: "Missing encryptedKey" });
@@ -297,7 +297,7 @@ app.post("/trade/cancel-all", async (req, res) => {
     const privateKey = await decryptPrivateKeyServerSide(
       deserializeEncryptedData(encryptedKey)
     );
-    const client = createHyperliquidClient(privateKey);
+    const client = createHyperliquidClient(privateKey, address);
     const result = await client.cancelAllOrders();
 
     res.json(result);
@@ -310,7 +310,7 @@ app.post("/trade/cancel-all", async (req, res) => {
 // Set leverage
 app.post("/leverage", async (req, res) => {
   try {
-    const { encryptedKey, asset, leverage } = req.body;
+    const { encryptedKey, address, asset, leverage } = req.body;
 
     if (!encryptedKey || !asset || !leverage) {
       res.status(400).json({ error: "Missing required fields" });
@@ -320,7 +320,7 @@ app.post("/leverage", async (req, res) => {
     const privateKey = await decryptPrivateKeyServerSide(
       deserializeEncryptedData(encryptedKey)
     );
-    const client = createHyperliquidClient(privateKey);
+    const client = createHyperliquidClient(privateKey, address);
     const success = await client.setLeverage(asset, leverage);
 
     res.json({ success });
@@ -333,7 +333,7 @@ app.post("/leverage", async (req, res) => {
 // Place stop loss
 app.post("/trade/stop-loss", async (req, res) => {
   try {
-    const { encryptedKey, asset, isLong, size, triggerPrice } = req.body;
+    const { encryptedKey, address, asset, isLong, size, triggerPrice } = req.body;
 
     if (
       !encryptedKey ||
@@ -349,7 +349,7 @@ app.post("/trade/stop-loss", async (req, res) => {
     const privateKey = await decryptPrivateKeyServerSide(
       deserializeEncryptedData(encryptedKey)
     );
-    const client = createHyperliquidClient(privateKey);
+    const client = createHyperliquidClient(privateKey, address);
     const result = await client.placeStopLoss(asset, isLong, size, triggerPrice);
 
     res.json(result);
@@ -362,7 +362,7 @@ app.post("/trade/stop-loss", async (req, res) => {
 // Place take profit
 app.post("/trade/take-profit", async (req, res) => {
   try {
-    const { encryptedKey, asset, isLong, size, triggerPrice } = req.body;
+    const { encryptedKey, address, asset, isLong, size, triggerPrice } = req.body;
 
     if (
       !encryptedKey ||
@@ -378,7 +378,7 @@ app.post("/trade/take-profit", async (req, res) => {
     const privateKey = await decryptPrivateKeyServerSide(
       deserializeEncryptedData(encryptedKey)
     );
-    const client = createHyperliquidClient(privateKey);
+    const client = createHyperliquidClient(privateKey, address);
     const result = await client.placeTakeProfit(
       asset,
       isLong,
@@ -396,7 +396,7 @@ app.post("/trade/take-profit", async (req, res) => {
 // Withdraw funds
 app.post("/withdraw", async (req, res) => {
   try {
-    const { encryptedKey, destination, amount } = req.body;
+    const { encryptedKey, address, destination, amount } = req.body;
 
     if (!encryptedKey || !destination) {
       res.status(400).json({ error: "Missing required fields" });
@@ -406,7 +406,7 @@ app.post("/withdraw", async (req, res) => {
     const privateKey = await decryptPrivateKeyServerSide(
       deserializeEncryptedData(encryptedKey)
     );
-    const client = createHyperliquidClient(privateKey);
+    const client = createHyperliquidClient(privateKey, address);
     const result = await client.withdrawFunds(destination, amount);
 
     res.json(result);
@@ -419,7 +419,7 @@ app.post("/withdraw", async (req, res) => {
 // Emergency withdraw (close all + withdraw)
 app.post("/emergency-withdraw", async (req, res) => {
   try {
-    const { encryptedKey, destination, amount } = req.body;
+    const { encryptedKey, address, destination, amount } = req.body;
 
     if (!encryptedKey || !destination) {
       res.status(400).json({ error: "Missing required fields" });
@@ -429,7 +429,7 @@ app.post("/emergency-withdraw", async (req, res) => {
     const privateKey = await decryptPrivateKeyServerSide(
       deserializeEncryptedData(encryptedKey)
     );
-    const client = createHyperliquidClient(privateKey);
+    const client = createHyperliquidClient(privateKey, address);
     const result = await client.emergencyWithdraw(destination, amount);
 
     res.json(result);
