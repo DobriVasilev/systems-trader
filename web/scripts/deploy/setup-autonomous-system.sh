@@ -41,10 +41,10 @@ log "=========================================="
 log ""
 
 # Configuration
-PROJECT_DIR="/var/www/systems-trader/web"
+PROJECT_DIR="/home/dobri/systems-trader/web"
 LOG_DIR="/var/log/feedback-watcher"
-USER="www-data"
-GROUP="www-data"
+USER="dobri"
+GROUP="dobri"
 
 # Step 1: Create log directory
 log "Creating log directory..."

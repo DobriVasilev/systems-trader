@@ -5,8 +5,8 @@ Wants=postgresql.service
 
 [Service]
 Type=simple
-User=www-data
-WorkingDirectory=/var/www/systems-trader/web
+User=dobri
+WorkingDirectory=/home/dobri/systems-trader/web
 Environment="NODE_ENV=production"
 Environment="PATH=/usr/bin:/usr/local/bin"
 
