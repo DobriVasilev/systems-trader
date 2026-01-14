@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { generateFeedbackPrompt, generateQuickPrompt, generateEmailFormat } from "@/lib/feedback-prompt-generator";
+import { promptGenerationRateLimit, checkRateLimit } from "@/lib/rate-limit";
 
 export async function POST(
   request: NextRequest,
@@ -16,13 +17,33 @@ export async function POST(
     );
   }
 
-  // Only admins can generate prompts
-  if (session.user.role !== "admin") {
+  // Rate limiting
+  const rateLimitResult = await checkRateLimit(
+    promptGenerationRateLimit,
+    session.user.id
+  );
+
+  if (!rateLimitResult.success) {
     return NextResponse.json(
-      { success: false, error: "Admin access required" },
-      { status: 403 }
+      {
+        success: false,
+        error: "Rate limit exceeded. Please try again later.",
+        limit: rateLimitResult.limit,
+        remaining: rateLimitResult.remaining,
+        reset: rateLimitResult.reset,
+      },
+      { status: 429 }
     );
   }
+
+  // Fetch user to check role
+  const user = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: { role: true },
+  });
+
+  const isDev = user?.role === "dev_team";
+  const isAdmin = user?.role === "admin";
 
   try {
     const { id } = await params;
@@ -53,6 +74,14 @@ export async function POST(
       return NextResponse.json(
         { success: false, error: "Feedback not found" },
         { status: 404 }
+      );
+    }
+
+    // Access control: Users can export their own feedback, admins can export any
+    if (!isAdmin && feedback.userId !== session.user.id) {
+      return NextResponse.json(
+        { success: false, error: "You can only export your own feedback" },
+        { status: 403 }
       );
     }
 

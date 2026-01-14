@@ -22,7 +22,9 @@ model User {
   image         String?
   password      String?   @db.Text // For credentials provider
 
-  // Role: admin, moderator, member
+  // Role: admin, moderator, member, dev_team
+  // dev_team = autonomous Claude Code workflow
+  // others = manual prompt export workflow
   role          String    @default("member")
 
   // Bio for profile
@@ -1122,6 +1124,17 @@ enum FeedbackStatus {
   CLOSED
 }
 
+enum ImplementationStatus {
+  PENDING
+  PROCESSING
+  ANALYZING
+  IMPLEMENTING
+  TESTING
+  DEPLOYING
+  COMPLETED
+  FAILED
+}
+
 model Feedback {
   id              String         @id @default(cuid())
   createdAt       DateTime       @default(now())
@@ -1168,10 +1181,26 @@ model Feedback {
   implementedBy   User?          @relation("ImplementedFeedback", fields: [implementedById], references: [id])
   implementationNotes String?    @db.Text
 
+  // Autonomous Implementation System
+  implementationStatus ImplementationStatus @default(PENDING)
+  claudeSessionId      String?              // Claude Code session tracking
+  implementationLog    Json?                // Detailed log of implementation steps
+  implementationPlan   Json?                // Parsed plan with tasks
+  currentTask          String?              // Currently executing task
+  deploymentStatus     String?              // Deployment status (queued, deploying, deployed, failed)
+  deploymentUrl        String?              // Vercel deployment URL
+  notificationSent     Boolean              @default(false) // Email notification sent
+  processedAt          DateTime?            // When Claude started processing
+  completedAt          DateTime?            // When implementation completed
+  errorMessage         String?              @db.Text // Last error if failed
+  retryCount           Int                  @default(0) // Number of retry attempts
+  maxRetries           Int                  @default(3) // Max retry attempts before giving up
+
   @@index([userId, status])
   @@index([type, status])
   @@index([status, createdAt])
   @@index([priority])
+  @@index([implementationStatus, processedAt])
 }
 
 model FeedbackAttachment {

@@ -34,6 +34,7 @@ export function WalletManager({ selectedWallet, onSelectWallet }: WalletManagerP
   const [isAdding, setIsAdding] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const [settingDefaultId, setSettingDefaultId] = useState<string | null>(null);
 
   // Security gate for sensitive actions
   const { requireSecurity, SecurityGate } = useSecurityGate();
@@ -134,6 +135,31 @@ export function WalletManager({ selectedWallet, onSelectWallet }: WalletManagerP
       setError("Network error");
     } finally {
       setDeletingId(null);
+    }
+  }
+
+  async function handleSetDefault(walletId: string) {
+    setSettingDefaultId(walletId);
+    setError("");
+
+    try {
+      const res = await fetch(`/api/wallets/${walletId}/set-default`, {
+        method: "POST",
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.error || "Failed to set default wallet");
+        return;
+      }
+
+      // Refresh wallets to show updated default
+      await fetchWallets();
+    } catch {
+      setError("Network error");
+    } finally {
+      setSettingDefaultId(null);
     }
   }
 
@@ -374,26 +400,52 @@ export function WalletManager({ selectedWallet, onSelectWallet }: WalletManagerP
                   </div>
                 </div>
 
-                {/* Delete Button */}
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleDeleteWallet(wallet.id);
-                  }}
-                  disabled={deletingId === wallet.id}
-                  className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 p-1.5 rounded-md hover:bg-red-900/30 text-gray-500 hover:text-red-400 transition-all disabled:opacity-50"
-                  title="Delete wallet"
-                >
-                  {deletingId === wallet.id ? (
-                    <svg className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                    </svg>
-                  ) : (
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </svg>
+                {/* Action Buttons */}
+                <div className="absolute top-2 right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  {/* Set as Default Button */}
+                  {!wallet.isDefault && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleSetDefault(wallet.id);
+                      }}
+                      disabled={settingDefaultId === wallet.id}
+                      className="p-1.5 rounded-md hover:bg-blue-900/30 text-gray-500 hover:text-blue-400 transition-all disabled:opacity-50"
+                      title="Set as default wallet"
+                    >
+                      {settingDefaultId === wallet.id ? (
+                        <svg className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                      ) : (
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                        </svg>
+                      )}
+                    </button>
                   )}
-                </button>
+
+                  {/* Delete Button */}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDeleteWallet(wallet.id);
+                    }}
+                    disabled={deletingId === wallet.id}
+                    className="p-1.5 rounded-md hover:bg-red-900/30 text-gray-500 hover:text-red-400 transition-all disabled:opacity-50"
+                    title="Delete wallet"
+                  >
+                    {deletingId === wallet.id ? (
+                      <svg className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
+                    ) : (
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                    )}
+                  </button>
+                </div>
 
                 {/* Selected Indicator */}
                 {selectedWallet?.id === wallet.id && (

@@ -14,7 +14,10 @@
     "db:migrate": "prisma migrate dev",
     "db:push": "prisma db push",
     "db:studio": "prisma studio",
-    "db:seed": "prisma db seed"
+    "db:seed": "prisma db seed",
+    "watch:feedback": "tsx scripts/feedback-watcher.ts",
+    "watch:feedback:runner": "./scripts/run-watcher.sh",
+    "monitor:claude": "tsx scripts/claude-health-monitor.ts"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.1",
@@ -62,6 +65,7 @@
     "playwright": "^1.57.0",
     "tailwindcss": "^4",
     "ts-node": "^10.9.2",
+    "tsx": "^4.21.0",
     "typescript": "^5"
   }
 }
