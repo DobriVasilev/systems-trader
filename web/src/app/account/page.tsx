@@ -436,76 +436,175 @@ export default function AccountPage() {
 
         {activeTab === "trading" && (
           <div className="space-y-4">
-            {/* Wallets Section */}
+            {/* Wallets */}
             <div className="bg-gray-900 rounded-lg border border-gray-800">
               <div className="p-4 border-b border-gray-800">
-                <h2 className="font-semibold">Trading Wallets</h2>
-                <p className="text-sm text-gray-500">Manage your trading wallets and view balances</p>
+                <h2 className="font-semibold">Wallets & Extension</h2>
+                <p className="text-sm text-gray-500">Manage wallets and TradingView extension API keys</p>
               </div>
-              <div className="p-4">
+              <div className="p-4 flex gap-3">
                 <Link
                   href="/trading"
                   className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm font-medium transition-colors"
                 >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                  </svg>
                   Manage Wallets
                 </Link>
-              </div>
-            </div>
-
-            {/* Extension API Keys Section */}
-            <div className="bg-gray-900 rounded-lg border border-gray-800">
-              <div className="p-4 border-b border-gray-800">
-                <h2 className="font-semibold">TradingView Extension</h2>
-                <p className="text-sm text-gray-500">API keys for TradingView Bridge extension</p>
-              </div>
-              <div className="p-4">
                 <Link
                   href="/trading/settings"
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm font-medium transition-colors"
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-sm font-medium transition-colors"
                 >
-                  Manage Extension Keys
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
+                  Extension Keys
                 </Link>
               </div>
             </div>
 
-            {/* Risk Management */}
+            {/* Advanced Trading Settings */}
             <div className="bg-gray-900 rounded-lg border border-gray-800">
               <div className="p-4 border-b border-gray-800">
-                <h2 className="font-semibold">Risk Management</h2>
-                <p className="text-sm text-gray-500">Configure default risk parameters for new trades</p>
+                <h2 className="font-semibold">Advanced Settings</h2>
+              </div>
+              <div className="p-4 space-y-3">
+                <label className="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg">
+                  <span className="text-sm">Auto-adjust leverage for balance</span>
+                  <Toggle checked={false} onChange={() => {}} disabled />
+                </label>
+                <label className="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg">
+                  <span className="text-sm">Auto-retry unfilled orders</span>
+                  <Toggle checked={false} onChange={() => {}} disabled />
+                </label>
+              </div>
+            </div>
+
+            {/* Liquidation Warnings */}
+            <div className="bg-gray-900 rounded-lg border border-gray-800">
+              <div className="p-4 border-b border-gray-800">
+                <h2 className="font-semibold">Liquidation Warnings</h2>
+                <p className="text-sm text-gray-500">Alert distances from liquidation price</p>
               </div>
               <div className="p-4 space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-400 mb-1">Default Risk Amount</label>
+                    <label className="block text-sm font-medium text-gray-400 mb-1">Warning Distance ($)</label>
                     <input
                       type="number"
                       className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg"
-                      placeholder="1.00"
-                      step="0.01"
+                      placeholder="300"
+                      step="50"
+                      min="50"
+                      disabled
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-400 mb-1">Default Leverage</label>
+                    <label className="block text-sm font-medium text-gray-400 mb-1">Danger Distance ($)</label>
                     <input
                       type="number"
                       className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg"
-                      placeholder="25"
-                      min="1"
-                      max="100"
+                      placeholder="100"
+                      step="10"
+                      min="10"
+                      disabled
                     />
                   </div>
                 </div>
-                <button className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm font-medium transition-colors">
-                  Save Risk Settings
-                </button>
               </div>
+            </div>
+
+            {/* PNL Verification */}
+            <div className="bg-gray-900 rounded-lg border border-gray-800">
+              <div className="p-4 border-b border-gray-800">
+                <h2 className="font-semibold">PNL Verification</h2>
+                <p className="text-sm text-gray-500">Risk and fee calculation parameters</p>
+              </div>
+              <div className="p-4 space-y-4">
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-400 mb-1">Tolerance (%)</label>
+                    <input
+                      type="number"
+                      className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg"
+                      placeholder="10"
+                      step="1"
+                      min="1"
+                      max="50"
+                      disabled
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-400 mb-1">Max Risk (x)</label>
+                    <input
+                      type="number"
+                      className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg"
+                      placeholder="2.0"
+                      step="0.5"
+                      min="1"
+                      max="5"
+                      disabled
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-400 mb-1">Fee Buffer (%)</label>
+                    <input
+                      type="number"
+                      className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg"
+                      placeholder="5"
+                      step="1"
+                      min="0"
+                      max="20"
+                      disabled
+                    />
+                  </div>
+                </div>
+                <p className="text-xs text-gray-500">Position sized to account for fees and slippage</p>
+              </div>
+            </div>
+
+            {/* Unfilled Orders */}
+            <div className="bg-gray-900 rounded-lg border border-gray-800">
+              <div className="p-4 border-b border-gray-800">
+                <h2 className="font-semibold">Unfilled Orders</h2>
+              </div>
+              <div className="p-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-400 mb-1">Wait Time (seconds)</label>
+                  <input
+                    type="number"
+                    className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg"
+                    placeholder="30"
+                    step="5"
+                    min="5"
+                    max="120"
+                    disabled
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Other Settings */}
+            <div className="bg-gray-900 rounded-lg border border-gray-800">
+              <div className="p-4 border-b border-gray-800">
+                <h2 className="font-semibold">Additional Options</h2>
+              </div>
+              <div className="p-4 space-y-3">
+                <label className="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg">
+                  <span className="text-sm">Live entry price on confirm modal</span>
+                  <Toggle checked={false} onChange={() => {}} disabled />
+                </label>
+                <label className="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg">
+                  <span className="text-sm">Copy trade report to clipboard on execute</span>
+                  <Toggle checked={false} onChange={() => {}} disabled />
+                </label>
+                <label className="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg">
+                  <span className="text-sm">Enable console debug logging</span>
+                  <Toggle checked={false} onChange={() => {}} disabled />
+                </label>
+              </div>
+            </div>
+
+            {/* Info Note */}
+            <div className="bg-blue-900/20 border border-blue-800 rounded-lg p-4">
+              <p className="text-sm text-blue-400">
+                💡 These settings are currently view-only. Full configuration coming soon. For now, settings can be adjusted per-trade on the Trading page.
+              </p>
             </div>
           </div>
         )}
