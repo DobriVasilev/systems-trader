@@ -95,7 +95,7 @@ export default function FeedbackImplementationProgress({ feedbackId }: Props) {
       opacity: 1,
       x: 0,
       transition: {
-        type: "spring",
+        type: "spring" as const,
         stiffness: 500,
         damping: 25,
       },
