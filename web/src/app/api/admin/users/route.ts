@@ -28,7 +28,7 @@ export async function GET() {
         emailVerified: true,
         _count: {
           select: {
-            feedback: true,
+            feedbackSubmitted: true,
             sessions: true,
           },
         },
