@@ -40,10 +40,11 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Rate limiting
+  // Rate limiting (admins bypass)
   const rateLimitResult = await checkRateLimit(
     feedbackRateLimit,
-    session.user.id
+    session.user.id,
+    isAdmin
   );
 
   if (!rateLimitResult.success) {

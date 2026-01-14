@@ -20,10 +20,20 @@ export async function POST(
     );
   }
 
-  // Rate limiting
+  // Fetch user to check role (before rate limiting for admin bypass)
+  const user = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: { role: true },
+  });
+
+  const isDev = user?.role === "dev_team";
+  const isAdmin = user?.role === "admin";
+
+  // Rate limiting (admins bypass)
   const rateLimitResult = await checkRateLimit(
     markForProcessingRateLimit,
-    session.user.id
+    session.user.id,
+    isAdmin
   );
 
   if (!rateLimitResult.success) {
@@ -38,15 +48,6 @@ export async function POST(
       { status: 429 }
     );
   }
-
-  // Fetch user to check role
-  const user = await prisma.user.findUnique({
-    where: { id: session.user.id },
-    select: { role: true },
-  });
-
-  const isDev = user?.role === "dev_team";
-  const isAdmin = user?.role === "admin";
 
   // Only dev_team and admin can trigger autonomous processing
   if (!isDev && !isAdmin) {
