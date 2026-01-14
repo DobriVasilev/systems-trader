@@ -43,13 +43,19 @@ export const markForProcessingRateLimit = redis
 // Helper function to check rate limit
 export async function checkRateLimit(
   limiter: Ratelimit | null,
-  identifier: string
+  identifier: string,
+  bypassForAdmin = false
 ): Promise<{
   success: boolean;
   limit?: number;
   remaining?: number;
   reset?: number;
 }> {
+  // Admin bypass - always allow
+  if (bypassForAdmin) {
+    return { success: true };
+  }
+
   if (!limiter) {
     // Rate limiting disabled if Redis not configured
     return { success: true };

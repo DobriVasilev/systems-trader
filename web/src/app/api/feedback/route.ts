@@ -59,16 +59,16 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // Fetch user role to determine workflow and bypass settings
+  const user = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: { role: true },
+  });
+
+  const isDev = user?.role === "dev_team";
+  const isAdmin = user?.role === "admin";
+
   try {
-    // Fetch user role to determine workflow
-    const user = await prisma.user.findUnique({
-      where: { id: session.user.id },
-      select: { role: true },
-    });
-
-    const isDev = user?.role === "dev_team";
-    const isAdmin = user?.role === "admin";
-
     const body = await request.json();
     const {
       type,
