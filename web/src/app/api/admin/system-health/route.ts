@@ -121,8 +121,10 @@ export async function GET(request: NextRequest) {
         where: {
           implementationStatus: "COMPLETED",
           processedAt: { not: null },
-          completedAt: { not: null },
-          completedAt: { gte: last7d },
+          AND: [
+            { completedAt: { not: null } },
+            { completedAt: { gte: last7d } },
+          ],
         },
         _avg: {
           // This won't work directly, need to calculate in application
