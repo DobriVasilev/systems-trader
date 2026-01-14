@@ -13,7 +13,8 @@ import { UserProfileSidebar } from "@/components/chat/UserProfileSidebar";
 import { AdminPanel } from "@/components/chat/AdminPanel";
 import { FriendRequestsList, SendRequestModal } from "@/components/chat/FriendRequests";
 import { ImageViewer } from "@/components/chat/ImageViewer";
-import { FileUpload } from "@/components/chat/FileUpload";
+import { InlineUploadButton } from "@/components/chat/FileUpload";
+import { AppHeader } from "@/components/layout/AppHeader";
 
 // Types
 interface ChatMessage {
@@ -1080,189 +1081,7 @@ function ChatPageContent() {
       className="h-screen flex flex-col overflow-hidden"
       style={{ backgroundColor: TELEGRAM_COLORS.bgColor, color: TELEGRAM_COLORS.text }}
     >
-      {/* Header */}
-      <header
-        className="backdrop-blur-sm sticky top-0 z-50"
-        style={{
-          backgroundColor: TELEGRAM_COLORS.headerBg,
-          borderBottom: `1px solid ${TELEGRAM_COLORS.border}`,
-        }}
-      >
-        <div className="container mx-auto px-4 py-3 flex items-center justify-between">
-          <nav className="flex items-center gap-2 text-sm">
-            <Link
-              href="/dashboard"
-              className="font-semibold hover:opacity-80 transition-opacity"
-              style={{ color: TELEGRAM_COLORS.text }}
-            >
-              Systems Trader
-            </Link>
-            <span style={{ color: TELEGRAM_COLORS.hint }}>/</span>
-            <span style={{ color: TELEGRAM_COLORS.hint }}>Chat</span>
-            {selectedChannel && (
-              <>
-                <span style={{ color: TELEGRAM_COLORS.hint }}>/</span>
-                <span style={{ color: TELEGRAM_COLORS.accent }}>
-                  {selectedChannel.icon} {selectedChannel.name}
-                </span>
-              </>
-            )}
-          </nav>
-
-          <div className="flex items-center gap-4">
-            {/* Search */}
-            <button
-              onClick={() => setShowSearch(true)}
-              className="p-2 transition-colors"
-              style={{ color: TELEGRAM_COLORS.hint }}
-              title="Search"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-            </button>
-
-            {/* Notifications */}
-            <div className="relative">
-              <button
-                onClick={() => {
-                  setShowNotifications(!showNotifications);
-                  if (!showNotifications) {
-                    markNotificationsRead();
-                  }
-                }}
-                className="p-2 transition-colors relative"
-                style={{ color: TELEGRAM_COLORS.hint }}
-                title="Notifications"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-                </svg>
-                {unreadNotifications > 0 && (
-                  <span
-                    className="absolute -top-1 -right-1 w-5 h-5 rounded-full text-xs flex items-center justify-center"
-                    style={{ backgroundColor: TELEGRAM_COLORS.destructive, color: "#fff" }}
-                  >
-                    {unreadNotifications > 9 ? "9+" : unreadNotifications}
-                  </span>
-                )}
-              </button>
-
-              {/* Notifications dropdown */}
-              {showNotifications && (
-                <div
-                  className="absolute right-0 top-full mt-2 w-80 rounded-lg shadow-xl max-h-96 overflow-y-auto z-50"
-                  style={{
-                    backgroundColor: TELEGRAM_COLORS.secondaryBg,
-                    border: `1px solid ${TELEGRAM_COLORS.border}`,
-                  }}
-                >
-                  <div
-                    className="p-3 font-medium"
-                    style={{
-                      color: TELEGRAM_COLORS.text,
-                      borderBottom: `1px solid ${TELEGRAM_COLORS.border}`,
-                    }}
-                  >
-                    Notifications
-                  </div>
-                  {notifications.length === 0 ? (
-                    <div className="p-4 text-center" style={{ color: TELEGRAM_COLORS.hint }}>
-                      No notifications
-                    </div>
-                  ) : (
-                    notifications.map((n) => (
-                      <div
-                        key={n.id}
-                        className="p-3 cursor-pointer hover:opacity-80"
-                        style={{
-                          borderBottom: `1px solid ${TELEGRAM_COLORS.border}50`,
-                          backgroundColor: !n.read ? `${TELEGRAM_COLORS.primary}20` : "transparent",
-                        }}
-                        onClick={() => {
-                          if (n.link) {
-                            window.location.href = n.link;
-                          }
-                          setShowNotifications(false);
-                        }}
-                      >
-                        <div className="font-medium text-sm" style={{ color: TELEGRAM_COLORS.text }}>{n.title}</div>
-                        <div className="text-xs mt-1" style={{ color: TELEGRAM_COLORS.hint }}>{n.body}</div>
-                        <div className="text-xs mt-1" style={{ color: TELEGRAM_COLORS.hint }}>
-                          {formatTime(n.createdAt)}
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* Friend Requests Button */}
-            <button
-              onClick={() => setShowFriendRequests(true)}
-              className="p-2 transition-colors hover:opacity-80"
-              style={{ color: TELEGRAM_COLORS.hint }}
-              title="Friend Requests"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-              </svg>
-            </button>
-
-            {/* Admin Panel Button */}
-            {isAdmin && (
-              <>
-                <button
-                  onClick={() => setShowAdminPanel(true)}
-                  className="p-2 transition-colors hover:opacity-80"
-                  style={{ color: TELEGRAM_COLORS.primary }}
-                  title="Admin Panel"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                  </svg>
-                </button>
-                <button
-                  onClick={async () => {
-                    if (confirm("Are you sure you want to clear ALL messages in this channel? This cannot be undone!")) {
-                      try {
-                        const res = await fetch(`/api/chat/messages?channelId=${selectedChannelId || "null"}`, {
-                          method: "DELETE",
-                        });
-                        if (res.ok) {
-                          setMessages([]);
-                        }
-                      } catch (error) {
-                        console.error("Error clearing messages:", error);
-                      }
-                    }
-                  }}
-                  className="p-2 transition-colors hover:opacity-80"
-                  style={{ color: TELEGRAM_COLORS.destructive }}
-                  title="Clear All Messages (Admin)"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                  </svg>
-                </button>
-              </>
-            )}
-
-            {/* Online count */}
-            <div className="flex items-center gap-2">
-              <div
-                className="w-2 h-2 rounded-full"
-                style={{ backgroundColor: TELEGRAM_COLORS.online }}
-              ></div>
-              <span className="text-sm" style={{ color: TELEGRAM_COLORS.hint }}>
-                {onlineUsers.length} online
-              </span>
-            </div>
-          </div>
-        </div>
-      </header>
+      <AppHeader title="Chat" />
 
       {/* Better Toggle UI - Prominent buttons */}
       <div
@@ -1920,15 +1739,12 @@ function ChatPageContent() {
 
                 <div className="flex items-end gap-2 relative">
                   {/* File upload button */}
-                  <div className="relative">
-                    <FileUpload
-                      channelId={selectedChannelId}
-                      onUploadComplete={(attachment) => {
-                        setUploadedAttachments(prev => [...prev, { id: attachment.id }]);
-                      }}
-                      maxFiles={5}
-                    />
-                  </div>
+                  <InlineUploadButton
+                    channelId={selectedChannelId}
+                    onUploadComplete={(attachment) => {
+                      setUploadedAttachments(prev => [...prev, { id: attachment.id }]);
+                    }}
+                  />
 
                   {/* Emoji button */}
                   <button
@@ -2131,6 +1947,14 @@ function ChatPageContent() {
                 }}
               >
                 <div className="flex items-end gap-2 relative">
+                  {/* File upload button */}
+                  <InlineUploadButton
+                    channelId={null}
+                    onUploadComplete={(attachment) => {
+                      setUploadedAttachments(prev => [...prev, { id: attachment.id }]);
+                    }}
+                  />
+
                   {/* Emoji button */}
                   <button
                     onClick={() => setShowInputEmoji(!showInputEmoji)}
