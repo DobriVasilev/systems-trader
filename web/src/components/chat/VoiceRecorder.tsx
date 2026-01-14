@@ -37,6 +37,26 @@ export function VoiceRecorder({ onSend, onCancel }: VoiceRecorderProps) {
   // Start recording
   const startRecording = useCallback(async () => {
     try {
+      // Check if browser supports required APIs
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        alert("❌ Voice recording is not supported in this browser. Please use Chrome, Firefox, or Safari.");
+        onCancel();
+        return;
+      }
+
+      if (typeof MediaRecorder === 'undefined') {
+        alert("❌ Voice recording is not supported in this browser. Please use Chrome, Firefox, or Safari.");
+        onCancel();
+        return;
+      }
+
+      // Check for HTTPS (required for getUserMedia, except on localhost)
+      if (window.location.protocol !== 'https:' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+        alert("❌ Voice recording requires a secure connection (HTTPS).");
+        onCancel();
+        return;
+      }
+
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
 
@@ -77,9 +97,29 @@ export function VoiceRecorder({ onSend, onCancel }: VoiceRecorderProps) {
       updateWaveform();
     } catch (err) {
       console.error("Error starting recording:", err);
+
+      // Provide user-friendly error messages
+      if (err instanceof Error) {
+        if (err.name === 'NotAllowedError') {
+          alert("🎤 Microphone access denied. Please enable microphone permissions in your browser settings and try again.");
+        } else if (err.name === 'NotFoundError') {
+          alert("🎤 No microphone found. Please connect a microphone and try again.");
+        } else if (err.name === 'NotReadableError') {
+          alert("🎤 Microphone is already in use by another application. Please close other apps using the microphone and try again.");
+        } else if (err.name === 'OverconstrainedError') {
+          alert("🎤 Microphone doesn't meet the required constraints. Please try a different microphone.");
+        } else if (err.name === 'SecurityError') {
+          alert("🎤 Security error: Voice recording may be blocked by your browser settings or requires HTTPS.");
+        } else {
+          alert(`🎤 Failed to start recording: ${err.message}`);
+        }
+      } else {
+        alert("🎤 Failed to start recording. Please check your microphone permissions.");
+      }
+
       onCancel();
     }
-  }, [onCancel]);
+  }, [onCancel]);  // updateWaveform and stopRecording are defined below
 
   // Update waveform visualization
   const updateWaveform = useCallback(() => {

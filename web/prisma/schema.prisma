@@ -1136,6 +1136,10 @@ model Feedback {
   priority        Int            @default(0) // User-set or admin-set priority
   status          FeedbackStatus @default(PENDING)
 
+  // Trading Indicator Feedback (optional, for indicator-specific feedback)
+  indicator       String?        // "BOS", "Swings", "MSB", "CHoCH", "FVG", "Liquidity", "POI", "Trend", "MTF", "Structure", "Other"
+  customIndicator String?        // Custom indicator name if indicator === "Other"
+
   // Content - Voice OR Text
   textContent     String?        @db.Text // Text description
   voiceAttachmentId String?      // Voice message attachment ID
