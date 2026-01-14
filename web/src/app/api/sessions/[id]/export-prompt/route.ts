@@ -1,13 +1,15 @@
 /**
  * Export Prompt API
  *
- * POST /api/sessions/[id]/export-prompt - Generate Claude Code prompt from session
+ * POST /api/sessions/[id]/export-prompt - Generate Claude Code prompt from session with attachments as ZIP
  * Admin only
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/db';
+import archiver from 'archiver';
+import { Readable } from 'stream';
 
 async function verifyAdmin(userId: string): Promise<boolean> {
   const user = await prisma.user.findUnique({
@@ -104,11 +106,92 @@ export async function POST(
       candleData: patternSession.candleData,
     };
 
-    return NextResponse.json({
-      success: true,
-      prompt,
-      jsonExport,
-      sessionName: patternSession.name,
+    // Collect all attachment URLs
+    const attachments: Array<{ url: string; name: string; category: string }> = [];
+
+    // From corrections
+    patternSession.corrections.forEach((correction: any) => {
+      if (correction.attachments && Array.isArray(correction.attachments)) {
+        correction.attachments.forEach((att: any) => {
+          attachments.push({
+            url: att.url,
+            name: att.name || `correction-${correction.id}-${attachments.length}`,
+            category: att.category || 'document',
+          });
+        });
+      }
+    });
+
+    // From comments
+    patternSession.comments.forEach((comment: any) => {
+      if (comment.attachments && Array.isArray(comment.attachments)) {
+        comment.attachments.forEach((att: any) => {
+          attachments.push({
+            url: att.url,
+            name: att.name || `comment-${comment.id}-${attachments.length}`,
+            category: att.category || 'document',
+          });
+        });
+      }
+    });
+
+    // Create ZIP file with prompt, JSON, and all attachments
+    const archive = archiver('zip', {
+      zlib: { level: 9 } // Maximum compression
+    });
+
+    // Create a readable stream for Next.js response
+    const chunks: Buffer[] = [];
+    archive.on('data', (chunk: Buffer) => chunks.push(chunk));
+
+    await new Promise<void>((resolve, reject) => {
+      archive.on('end', resolve);
+      archive.on('error', reject);
+
+      // Add prompt as markdown file
+      archive.append(prompt, { name: 'prompt.md' });
+
+      // Add JSON export
+      archive.append(JSON.stringify(jsonExport, null, 2), { name: 'session-data.json' });
+
+      // Download and add all attachments
+      const downloadPromises = attachments.map(async (att) => {
+        try {
+          const response = await fetch(att.url);
+          if (!response.ok) {
+            console.warn(`Failed to download attachment: ${att.url}`);
+            return;
+          }
+
+          const arrayBuffer = await response.arrayBuffer();
+          const buffer = Buffer.from(arrayBuffer);
+
+          // Organize by category
+          const folder = att.category === 'image' ? 'screenshots' : 'attachments';
+          archive.append(buffer, { name: `${folder}/${att.name}` });
+        } catch (error) {
+          console.error(`Error downloading attachment ${att.url}:`, error);
+        }
+      });
+
+      // Wait for all downloads to complete
+      Promise.all(downloadPromises).then(() => {
+        archive.finalize();
+      }).catch(reject);
+    });
+
+    // Create response with ZIP file
+    const zipBuffer = Buffer.concat(chunks);
+    const sanitizedName = patternSession.name.replace(/[^a-zA-Z0-9-_]/g, '_');
+    const filename = `${sanitizedName}-feedback-${new Date().toISOString().slice(0, 10)}.zip`;
+
+    return new NextResponse(zipBuffer, {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/zip',
+        'Content-Disposition': `attachment; filename="${filename}"`,
+        'Content-Length': zipBuffer.length.toString(),
+      },
     });
   } catch (error) {
     console.error('Error exporting prompt:', error);

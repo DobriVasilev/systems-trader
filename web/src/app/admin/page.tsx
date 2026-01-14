@@ -112,39 +112,45 @@ export default function AdminPage() {
     fetchData();
   }, [activeTab, authSession, status, router]);
 
-  // Export prompt function
+  // Export prompt function - downloads ZIP with prompt, JSON, and all screenshots
   const handleExport = async (sessionId: string) => {
     setExporting(sessionId);
     try {
       const response = await fetch(`/api/sessions/${sessionId}/export-prompt`, {
         method: "POST",
       });
-      const data = await response.json();
 
-      if (data.success) {
-        // Create full export text with prompt and JSON
-        const exportText = `${data.prompt}\n\n---\n\nJSON Data (download and reference this):\n${JSON.stringify(data.jsonExport, null, 2)}`;
-
-        // Copy prompt to clipboard
-        await navigator.clipboard.writeText(exportText);
-
-        // Also trigger JSON download
-        const blob = new Blob([JSON.stringify(data.jsonExport, null, 2)], { type: "application/json" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `${data.sessionName}-feedback.json`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-
-        alert("Prompt copied to clipboard and JSON downloaded!");
-      } else {
-        alert("Export failed: " + data.error);
+      if (!response.ok) {
+        throw new Error(`Export failed: ${response.statusText}`);
       }
-    } catch {
-      alert("Export failed");
+
+      // Get the ZIP file as blob
+      const blob = await response.blob();
+
+      // Extract filename from Content-Disposition header
+      const contentDisposition = response.headers.get('Content-Disposition');
+      let filename = 'session-feedback.zip';
+      if (contentDisposition) {
+        const matches = /filename="([^"]+)"/.exec(contentDisposition);
+        if (matches && matches[1]) {
+          filename = matches[1];
+        }
+      }
+
+      // Trigger download
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      alert("Feedback package downloaded! Contains prompt, JSON data, and all screenshots.");
+    } catch (error) {
+      console.error("Export error:", error);
+      alert("Export failed: " + (error instanceof Error ? error.message : "Unknown error"));
     } finally {
       setExporting(null);
     }
