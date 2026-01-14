@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { useSessions, PatternSession } from "@/hooks/useSessions";
+import { AppHeader } from "@/components/layout/AppHeader";
 
 function formatDate(dateString: string): string {
   const date = new Date(dateString);
@@ -357,102 +358,8 @@ export default function DashboardPage() {
   );
 
   return (
-    <main className="min-h-screen bg-gray-950 text-gray-100">
-      {/* Header */}
-      <header className="border-b border-gray-800 bg-gray-900/50 backdrop-blur-sm sticky top-0 z-50">
-        <div className="container mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Link href="/" className="text-xl font-bold">
-              Systems Trader
-            </Link>
-            <span className="text-gray-500">/</span>
-            <span className="text-gray-400">Dashboard</span>
-          </div>
-          <div className="flex items-center gap-4">
-            <Link
-              href="/trading"
-              className="px-4 py-2 text-gray-300 hover:bg-gray-800 rounded-lg transition-colors flex items-center gap-2"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-              </svg>
-              Trading
-            </Link>
-            <Link
-              href="/chat"
-              className="px-4 py-2 text-gray-300 hover:bg-gray-800 rounded-lg transition-colors flex items-center gap-2"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-              </svg>
-              Chat
-            </Link>
-            <Link
-              href="/sessions/new"
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium
-                       hover:bg-blue-700 transition-colors flex items-center gap-2"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
-              New Session
-            </Link>
-            <div className="relative group">
-              <button className="flex items-center gap-2 p-1 rounded-full hover:bg-gray-800 transition-colors">
-                {session?.user?.image ? (
-                  <img
-                    src={session.user.image}
-                    alt={session.user.name || ""}
-                    className="w-8 h-8 rounded-full"
-                  />
-                ) : (
-                  <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-sm font-medium">
-                    {session?.user?.name?.charAt(0) || "U"}
-                  </div>
-                )}
-              </button>
-              {/* Dropdown */}
-              <div className="absolute right-0 top-full mt-1 w-48 bg-gray-900 rounded-lg shadow-xl border border-gray-800 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all">
-                <div className="p-3 border-b border-gray-800">
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium text-sm">{session?.user?.name}</span>
-                    {session?.user?.role === "admin" && (
-                      <span className="px-1.5 py-0.5 text-[10px] bg-red-900/50 text-red-300 rounded">ADMIN</span>
-                    )}
-                  </div>
-                  <div className="text-xs text-gray-500 truncate">{session?.user?.email}</div>
-                </div>
-                <div className="p-1">
-                  {session?.user?.role === "admin" && (
-                    <Link
-                      href="/admin"
-                      className="flex items-center gap-2 px-3 py-2 text-sm text-red-400 hover:bg-gray-800 rounded-md transition-colors"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                      </svg>
-                      Admin Panel
-                    </Link>
-                  )}
-                  <Link
-                    href="/account"
-                    className="block px-3 py-2 text-sm text-gray-300 hover:bg-gray-800 rounded-md transition-colors"
-                  >
-                    Account Settings
-                  </Link>
-                  <button
-                    onClick={() => signOut({ callbackUrl: "/" })}
-                    className="w-full text-left px-3 py-2 text-sm text-red-400 hover:bg-gray-800 rounded-md transition-colors"
-                  >
-                    Sign Out
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </header>
+    <main className="min-h-screen bg-gray-50">
+      <AppHeader title="Dashboard" />
 
       {/* Content */}
       <div className="container mx-auto px-4 py-8">

@@ -1,12 +1,25 @@
 "use client";
 
-import { memo, useState, useRef } from "react";
+import { memo, useState, useRef, useEffect } from "react";
 import { TELEGRAM_COLORS, DEFAULT_REACTIONS } from "@/lib/telegram-theme";
+import { VoiceMessagePlayer } from "./VoiceRecorder";
 
 interface Reaction {
   emoji: string;
   count: number;
   userReacted: boolean;
+}
+
+interface Attachment {
+  id: string;
+  url: string;
+  filename: string;
+  contentType: string;
+  category: string;
+  size: number;
+  duration?: number | null;
+  transcription?: string | null;
+  transcriptionStatus?: string | null;
 }
 
 interface MessageBubbleProps {
@@ -26,6 +39,7 @@ interface MessageBubbleProps {
     content: string;
   } | null;
   readStatus?: "sending" | "sent" | "delivered" | "read";
+  attachments?: Attachment[];
   // For message grouping
   isFirstInGroup?: boolean;
   isLastInGroup?: boolean;
@@ -34,6 +48,7 @@ interface MessageBubbleProps {
   onEdit?: () => void;
   onDelete?: () => void;
   onUserClick: (userId: string) => void;
+  onImageClick?: (imageUrl: string) => void;
   renderContent: (content: string) => React.ReactNode;
 }
 
@@ -50,6 +65,7 @@ function MessageBubbleComponent({
   reactions,
   replyTo,
   readStatus,
+  attachments,
   isFirstInGroup = true,
   isLastInGroup = true,
   onReply,
@@ -57,18 +73,89 @@ function MessageBubbleComponent({
   onEdit,
   onDelete,
   onUserClick,
+  onImageClick,
   renderContent,
 }: MessageBubbleProps) {
   const [showReactionPicker, setShowReactionPicker] = useState(false);
   const [showActions, setShowActions] = useState(false);
+  const [voiceTranscriptions, setVoiceTranscriptions] = useState<Record<string, string>>({});
   const longPressTimer = useRef<NodeJS.Timeout | null>(null);
   const lastTapTime = useRef<number>(0);
+
+  // Swipe-to-reply state
+  const touchStartX = useRef<number>(0);
+  const touchStartY = useRef<number>(0);
+  const [swipeOffset, setSwipeOffset] = useState(0);
 
   const isOwn = userId === currentUserId;
   const time = new Date(createdAt).toLocaleTimeString([], {
     hour: "2-digit",
     minute: "2-digit",
   });
+
+  // Swipe gesture handlers
+  const handleTouchStartSwipe = (e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+    touchStartY.current = e.touches[0].clientY;
+  };
+
+  const handleTouchMoveSwipe = (e: React.TouchEvent) => {
+    if (!touchStartX.current) return;
+
+    const currentX = e.touches[0].clientX;
+    const currentY = e.touches[0].clientY;
+    const deltaX = currentX - touchStartX.current;
+    const deltaY = currentY - touchStartY.current;
+
+    // Only trigger swipe if horizontal movement is greater than vertical
+    if (Math.abs(deltaX) > Math.abs(deltaY) && deltaX > 0 && deltaX < 80) {
+      setSwipeOffset(deltaX);
+      e.preventDefault();
+    }
+  };
+
+  const handleTouchEndSwipe = () => {
+    if (swipeOffset > 50) {
+      // Trigger reply
+      onReply();
+    }
+
+    // Reset
+    setSwipeOffset(0);
+    touchStartX.current = 0;
+    touchStartY.current = 0;
+  };
+
+  // Poll for transcriptions for voice messages
+  useEffect(() => {
+    if (!attachments) return;
+
+    const voiceAttachments = attachments.filter(
+      (a) => a.category === "audio" && a.transcriptionStatus === "processing"
+    );
+
+    if (voiceAttachments.length === 0) return;
+
+    const pollInterval = setInterval(async () => {
+      for (const attachment of voiceAttachments) {
+        try {
+          const res = await fetch(`/api/chat/transcribe?attachmentId=${attachment.id}`);
+          const data = await res.json();
+
+          if (data.success && data.data.status === "completed" && data.data.transcription) {
+            setVoiceTranscriptions((prev) => ({
+              ...prev,
+              [attachment.id]: data.data.transcription,
+            }));
+          }
+        } catch (error) {
+          console.error("Error polling transcription:", error);
+        }
+      }
+    }, 3000); // Poll every 3 seconds
+
+    return () => clearInterval(pollInterval);
+  }, [attachments]);
 
   // Double tap detection for quick react
   const handleTap = () => {
@@ -150,14 +237,22 @@ function MessageBubbleComponent({
 
   return (
     <div
-      className={`group flex items-end gap-2 ${isOwn ? "flex-row-reverse" : ""}`}
+      className={`group flex items-end gap-2 ${isOwn ? "flex-row-reverse" : ""} transition-transform`}
       style={{
         marginTop: isFirstInGroup ? "8px" : "2px",
         marginBottom: isLastInGroup ? "8px" : "2px",
+        transform: swipeOffset > 0 ? `translateX(${swipeOffset}px)` : "none",
       }}
       onClick={handleTap}
-      onTouchStart={handleTouchStart}
-      onTouchEnd={handleTouchEnd}
+      onTouchStart={(e) => {
+        handleTouchStart(e);
+        handleTouchStartSwipe(e);
+      }}
+      onTouchMove={handleTouchMoveSwipe}
+      onTouchEnd={(e) => {
+        handleTouchEnd(e);
+        handleTouchEndSwipe();
+      }}
       onMouseEnter={() => setShowActions(true)}
       onMouseLeave={() => {
         setShowActions(false);
@@ -248,6 +343,87 @@ function MessageBubbleComponent({
           }}
         >
           <BubbleTail side={isOwn ? "right" : "left"} />
+
+          {/* Image Attachments */}
+          {attachments && attachments.length > 0 && (
+            <div className="space-y-2 mb-2">
+              {attachments
+                .filter((a) => a.category === "image")
+                .map((attachment) => (
+                  <button
+                    key={attachment.id}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onImageClick?.(attachment.url);
+                    }}
+                    className="block rounded-lg overflow-hidden hover:opacity-90 transition-opacity"
+                  >
+                    <img
+                      src={attachment.url}
+                      alt={attachment.filename}
+                      className="max-w-full max-h-64 object-cover rounded-lg"
+                    />
+                  </button>
+                ))}
+            </div>
+          )}
+
+          {/* Voice Attachments */}
+          {attachments && attachments.length > 0 && (
+            <div className="space-y-2 mb-2">
+              {attachments
+                .filter((a) => a.category === "audio")
+                .map((attachment) => (
+                  <div key={attachment.id} className="flex flex-col gap-2">
+                    <VoiceMessagePlayer
+                      audioUrl={attachment.url}
+                      duration={attachment.duration || 0}
+                      isPlayed={false}
+                    />
+                    {/* Transcription */}
+                    {(attachment.transcription || voiceTranscriptions[attachment.id]) && (
+                      <div
+                        className="text-sm px-3 py-2 rounded-lg italic"
+                        style={{
+                          backgroundColor: isOwn
+                            ? "rgba(255, 255, 255, 0.1)"
+                            : "rgba(255, 255, 255, 0.05)",
+                          color: TELEGRAM_COLORS.hint,
+                        }}
+                      >
+                        {attachment.transcription || voiceTranscriptions[attachment.id]}
+                      </div>
+                    )}
+                    {/* Transcription status */}
+                    {attachment.transcriptionStatus === "processing" &&
+                      !attachment.transcription &&
+                      !voiceTranscriptions[attachment.id] && (
+                        <div
+                          className="text-xs px-3 py-1 rounded flex items-center gap-2"
+                          style={{ color: TELEGRAM_COLORS.hint }}
+                        >
+                          <div
+                            className="w-3 h-3 border-2 border-t-transparent rounded-full animate-spin"
+                            style={{
+                              borderColor: TELEGRAM_COLORS.hint,
+                              borderTopColor: "transparent",
+                            }}
+                          />
+                          <span>Transcribing...</span>
+                        </div>
+                      )}
+                    {attachment.transcriptionStatus === "failed" && (
+                      <div
+                        className="text-xs px-3 py-1 rounded"
+                        style={{ color: TELEGRAM_COLORS.destructive }}
+                      >
+                        Transcription failed
+                      </div>
+                    )}
+                  </div>
+                ))}
+            </div>
+          )}
 
           {/* Content */}
           <div style={{ color: TELEGRAM_COLORS.text }}>

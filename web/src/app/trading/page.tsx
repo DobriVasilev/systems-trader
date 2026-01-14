@@ -4,6 +4,7 @@ import { useSession, signOut } from "next-auth/react";
 import { redirect } from "next/navigation";
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
+import { AppHeader } from "@/components/layout/AppHeader";
 
 import { WalletManager } from "@/components/trading/WalletManager";
 import { AccountOverview } from "@/components/trading/AccountOverview";

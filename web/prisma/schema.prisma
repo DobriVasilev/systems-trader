@@ -83,6 +83,11 @@ model User {
   trades                 Trade[]
   extensionKeys          ExtensionKey[]
 
+  // Feedback System
+  feedbackSubmitted      Feedback[]        @relation("UserFeedback")
+  feedbackImplemented    Feedback[]        @relation("ImplementedFeedback")
+  feedbackComments       FeedbackComment[] @relation("FeedbackComments")
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -778,6 +783,12 @@ model ChatAttachment {
   status        String   @default("pending") // pending, uploaded, processing, ready, deleted
   metadata      Json?    // Width, height, duration, etc.
 
+  // Voice transcription (for audio/voice messages)
+  transcription       String?  @db.Text // Transcribed text from Whisper
+  transcriptionStatus String?  // pending, processing, completed, failed
+  duration            Int?     // Duration in seconds for audio/video
+  waveform            Json?    // Waveform visualization data [40 bars]
+
   // Timestamps
   uploadedAt    DateTime?
   deletedAt     DateTime?
@@ -1089,4 +1100,114 @@ model Friendship {
   @@unique([user1Id, user2Id])
   @@index([user1Id])
   @@index([user2Id])
+}
+
+// ============================================================================
+// UNIVERSAL FEEDBACK SYSTEM - Right-click anywhere to report issues
+// ============================================================================
+
+enum FeedbackType {
+  BUG_REPORT
+  FEATURE_REQUEST
+  UI_UX_ISSUE
+  PERFORMANCE_ISSUE
+  QUESTION
+  OTHER
+}
+
+enum FeedbackStatus {
+  PENDING
+  IN_PROGRESS
+  IMPLEMENTED
+  CLOSED
+}
+
+model Feedback {
+  id              String         @id @default(cuid())
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  // Ownership
+  userId          String
+  user            User           @relation("UserFeedback", fields: [userId], references: [id], onDelete: Cascade)
+
+  // Type and priority
+  type            FeedbackType   @default(OTHER)
+  priority        Int            @default(0) // User-set or admin-set priority
+  status          FeedbackStatus @default(PENDING)
+
+  // Content - Voice OR Text
+  textContent     String?        @db.Text // Text description
+  voiceAttachmentId String?      // Voice message attachment ID
+  voiceTranscription String?     @db.Text // Auto-transcribed from voice
+
+  // Additional details
+  title           String?        // Optional title
+  stepsToReproduce String?      @db.Text
+  expectedBehavior String?      @db.Text
+  actualBehavior   String?      @db.Text
+
+  // Context (auto-captured)
+  pageUrl         String?        // URL where feedback was submitted
+  pagePath        String?        // Route path
+  userAgent       String?        @db.Text // Browser info
+  screenResolution String?       // e.g., "1920x1080"
+  viewport        String?        // e.g., "1200x800"
+
+  // Attachments (screenshots, videos, documents)
+  attachments     FeedbackAttachment[]
+  comments        FeedbackComment[]
+
+  // Implementation
+  implementedAt   DateTime?
+  implementedById String?
+  implementedBy   User?          @relation("ImplementedFeedback", fields: [implementedById], references: [id])
+  implementationNotes String?    @db.Text
+
+  @@index([userId, status])
+  @@index([type, status])
+  @@index([status, createdAt])
+  @@index([priority])
+}
+
+model FeedbackAttachment {
+  id          String   @id @default(cuid())
+  createdAt   DateTime @default(now())
+
+  feedbackId  String
+  feedback    Feedback @relation(fields: [feedbackId], references: [id], onDelete: Cascade)
+
+  // File info (reuses R2 upload infrastructure)
+  filename    String
+  url         String
+  contentType String
+  size        Int
+  category    String   // screenshot, video, document, voice
+
+  // For images/videos
+  width       Int?
+  height      Int?
+  duration    Int?     // For videos/voice
+
+  @@index([feedbackId])
+}
+
+model FeedbackComment {
+  id          String   @id @default(cuid())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  feedbackId  String
+  feedback    Feedback @relation(fields: [feedbackId], references: [id], onDelete: Cascade)
+
+  userId      String
+  user        User     @relation("FeedbackComments", fields: [userId], references: [id], onDelete: Cascade)
+
+  content     String   @db.Text
+  isInternal  Boolean  @default(false) // Admin-only comments
+
+  editedAt    DateTime?
+
+  @@index([feedbackId, createdAt])
+  @@index([userId])
 }

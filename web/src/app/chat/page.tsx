@@ -12,6 +12,8 @@ import { TypingIndicator } from "@/components/chat/TypingIndicator";
 import { UserProfileSidebar } from "@/components/chat/UserProfileSidebar";
 import { AdminPanel } from "@/components/chat/AdminPanel";
 import { FriendRequestsList, SendRequestModal } from "@/components/chat/FriendRequests";
+import { ImageViewer } from "@/components/chat/ImageViewer";
+import { FileUpload } from "@/components/chat/FileUpload";
 
 // Types
 interface ChatMessage {
@@ -207,6 +209,12 @@ function ChatPageContent() {
   const [showSendRequestModal, setShowSendRequestModal] = useState(false);
   const [sendRequestUserId, setSendRequestUserId] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+
+  // Image viewer state
+  const [viewerImageUrl, setViewerImageUrl] = useState<string | null>(null);
+
+  // File upload state
+  const [uploadedAttachments, setUploadedAttachments] = useState<Array<{ id: string }>>([]);
 
   // Refs
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -675,7 +683,7 @@ function ChatPageContent() {
 
   // Send message
   const sendMessage = async () => {
-    if (!inputValue.trim() || !session?.user || isSending) return;
+    if ((!inputValue.trim() && uploadedAttachments.length === 0) || !session?.user || isSending) return;
 
     setIsSending(true);
     clearTypingIndicator();
@@ -688,6 +696,7 @@ function ChatPageContent() {
           content: inputValue,
           replyToId: replyingTo?.id,
           channelId: selectedChannelId,
+          attachments: uploadedAttachments.length > 0 ? uploadedAttachments.map(a => a.id) : undefined,
         }),
       });
       const data = await res.json();
@@ -698,10 +707,96 @@ function ChatPageContent() {
         });
         setInputValue("");
         setReplyingTo(null);
+        setUploadedAttachments([]);
         inputRef.current?.focus();
       }
     } catch (error) {
       console.error("Error sending message:", error);
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  // Send voice message
+  const sendVoiceMessage = async (audioBlob: Blob, duration: number) => {
+    if (!session?.user || isSending) return;
+
+    setIsSending(true);
+
+    try {
+      // Convert blob to File
+      const audioFile = new File([audioBlob], `voice-${Date.now()}.webm`, {
+        type: audioBlob.type || "audio/webm",
+      });
+
+      // Step 1: Get presigned upload URL
+      const uploadRes = await fetch("/api/chat/upload", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          filename: audioFile.name,
+          contentType: audioFile.type,
+          fileSize: audioFile.size,
+          channelId: selectedChannelId,
+        }),
+      });
+
+      const uploadData = await uploadRes.json();
+      if (!uploadData.success) {
+        throw new Error(uploadData.error || "Failed to prepare upload");
+      }
+
+      // Step 2: Upload to R2
+      await fetch(uploadData.data.uploadUrl, {
+        method: "PUT",
+        headers: {
+          "Content-Type": audioFile.type,
+        },
+        body: audioFile,
+      });
+
+      // Step 3: Confirm upload
+      await fetch("/api/chat/upload", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          attachmentId: uploadData.data.attachmentId,
+        }),
+      });
+
+      // Step 4: Trigger transcription (async, don't wait)
+      fetch("/api/chat/transcribe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          attachmentId: uploadData.data.attachmentId,
+        }),
+      }).catch((err) => console.error("Transcription error:", err));
+
+      // Step 5: Send message with attachment
+      const messageRes = await fetch("/api/chat/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          content: `🎤 Voice message (${duration.toFixed(1)}s)`,
+          attachments: [uploadData.data.attachmentId],
+          replyToId: replyingTo?.id,
+          channelId: selectedChannelId,
+        }),
+      });
+
+      const messageData = await messageRes.json();
+      if (messageData.success) {
+        setMessages((prev) => {
+          if (prev.some((m) => m.id === messageData.data.id)) return prev;
+          return [...prev, messageData.data];
+        });
+        setReplyingTo(null);
+        inputRef.current?.focus();
+      }
+    } catch (error) {
+      console.error("Error sending voice message:", error);
+      alert("Failed to send voice message. Please try again.");
     } finally {
       setIsSending(false);
     }
@@ -1112,17 +1207,42 @@ function ChatPageContent() {
 
             {/* Admin Panel Button */}
             {isAdmin && (
-              <button
-                onClick={() => setShowAdminPanel(true)}
-                className="p-2 transition-colors hover:opacity-80"
-                style={{ color: TELEGRAM_COLORS.primary }}
-                title="Admin Panel"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
-              </button>
+              <>
+                <button
+                  onClick={() => setShowAdminPanel(true)}
+                  className="p-2 transition-colors hover:opacity-80"
+                  style={{ color: TELEGRAM_COLORS.primary }}
+                  title="Admin Panel"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                </button>
+                <button
+                  onClick={async () => {
+                    if (confirm("Are you sure you want to clear ALL messages in this channel? This cannot be undone!")) {
+                      try {
+                        const res = await fetch(`/api/chat/messages?channelId=${selectedChannelId || "null"}`, {
+                          method: "DELETE",
+                        });
+                        if (res.ok) {
+                          setMessages([]);
+                        }
+                      } catch (error) {
+                        console.error("Error clearing messages:", error);
+                      }
+                    }
+                  }}
+                  className="p-2 transition-colors hover:opacity-80"
+                  style={{ color: TELEGRAM_COLORS.destructive }}
+                  title="Clear All Messages (Admin)"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                </button>
+              </>
             )}
 
             {/* Online count */}
@@ -1139,6 +1259,41 @@ function ChatPageContent() {
         </div>
       </header>
 
+      {/* Better Toggle UI - Prominent buttons */}
+      <div
+        className="px-6 py-3 flex gap-3"
+        style={{ borderBottom: `1px solid ${TELEGRAM_COLORS.border}` }}
+      >
+        <button
+          onClick={() => setViewMode("channels")}
+          className="flex-1 px-6 py-3 rounded-lg font-medium transition-all"
+          style={{
+            backgroundColor: viewMode === "channels" ? TELEGRAM_COLORS.primary : TELEGRAM_COLORS.secondaryBg,
+            color: viewMode === "channels" ? "#fff" : TELEGRAM_COLORS.text,
+          }}
+        >
+          🌐 Community & Channels
+        </button>
+        <button
+          onClick={() => setViewMode("dms")}
+          className="flex-1 px-6 py-3 rounded-lg font-medium transition-all relative"
+          style={{
+            backgroundColor: viewMode === "dms" ? TELEGRAM_COLORS.primary : TELEGRAM_COLORS.secondaryBg,
+            color: viewMode === "dms" ? "#fff" : TELEGRAM_COLORS.text,
+          }}
+        >
+          💬 Direct Messages
+          {conversations.reduce((sum, c) => sum + c.unreadCount, 0) > 0 && (
+            <span
+              className="absolute top-2 right-2 w-6 h-6 rounded-full text-xs flex items-center justify-center font-bold"
+              style={{ backgroundColor: TELEGRAM_COLORS.destructive, color: "#fff" }}
+            >
+              {conversations.reduce((sum, c) => sum + c.unreadCount, 0)}
+            </span>
+          )}
+        </button>
+      </div>
+
       <div className="flex-1 flex overflow-hidden">
         {/* Sidebar */}
         <aside
@@ -1148,35 +1303,6 @@ function ChatPageContent() {
             borderRight: `1px solid ${TELEGRAM_COLORS.border}`,
           }}
         >
-          {/* View Mode Tabs */}
-          <div className="flex" style={{ borderBottom: `1px solid ${TELEGRAM_COLORS.border}` }}>
-            <button
-              onClick={() => setViewMode("channels")}
-              className="flex-1 px-4 py-3 text-sm font-medium transition-colors"
-              style={{
-                color: viewMode === "channels" ? TELEGRAM_COLORS.text : TELEGRAM_COLORS.hint,
-                borderBottom: viewMode === "channels" ? `2px solid ${TELEGRAM_COLORS.primary}` : "2px solid transparent",
-              }}
-            >
-              Channels
-            </button>
-            <button
-              onClick={() => setViewMode("dms")}
-              className="flex-1 px-4 py-3 text-sm font-medium transition-colors relative"
-              style={{
-                color: viewMode === "dms" ? TELEGRAM_COLORS.text : TELEGRAM_COLORS.hint,
-                borderBottom: viewMode === "dms" ? `2px solid ${TELEGRAM_COLORS.primary}` : "2px solid transparent",
-              }}
-            >
-              DMs
-              {conversations.reduce((sum, c) => sum + c.unreadCount, 0) > 0 && (
-                <span
-                  className="absolute top-2 right-2 w-2 h-2 rounded-full"
-                  style={{ backgroundColor: TELEGRAM_COLORS.destructive }}
-                ></span>
-              )}
-            </button>
-          </div>
 
           {/* Sidebar Content */}
           <div className="flex-1 overflow-y-auto">
@@ -1375,11 +1501,13 @@ function ChatPageContent() {
           </div>
         </aside>
 
-        {/* Main Chat Area */}
+        {/* Main Chat Area - with grid for messages + online users */}
         <div
-          className="flex-1 flex flex-col"
+          className="flex-1 grid grid-cols-1 lg:grid-cols-[1fr,250px]"
           style={{ backgroundColor: TELEGRAM_COLORS.bgColor }}
         >
+          {/* Messages Section */}
+          <div className="flex flex-col">
           {isLoading ? (
             <div className="flex-1 flex items-center justify-center">
               <div className="flex items-center gap-3">
@@ -1759,7 +1887,44 @@ function ChatPageContent() {
                   }}
                 />
 
+                {/* File Upload Attachments Preview */}
+                {uploadedAttachments.length > 0 && (
+                  <div className="mb-2 flex flex-wrap gap-2">
+                    {uploadedAttachments.map((att: any, idx) => (
+                      <div
+                        key={idx}
+                        className="relative px-3 py-2 rounded-lg flex items-center gap-2"
+                        style={{ backgroundColor: TELEGRAM_COLORS.secondaryBg }}
+                      >
+                        <span className="text-sm" style={{ color: TELEGRAM_COLORS.text }}>
+                          📎 Attachment
+                        </span>
+                        <button
+                          onClick={() => setUploadedAttachments(prev => prev.filter((_, i) => i !== idx))}
+                          className="hover:opacity-80"
+                          style={{ color: TELEGRAM_COLORS.hint }}
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
                 <div className="flex items-end gap-2 relative">
+                  {/* File upload button */}
+                  <div className="relative">
+                    <FileUpload
+                      channelId={selectedChannelId}
+                      onUploadComplete={(attachment) => {
+                        setUploadedAttachments(prev => [...prev, { id: attachment.id }]);
+                      }}
+                      maxFiles={5}
+                    />
+                  </div>
+
                   {/* Emoji button */}
                   <button
                     onClick={() => setShowInputEmoji(!showInputEmoji)}
@@ -1791,13 +1956,9 @@ function ChatPageContent() {
                   {/* Voice recorder or Send button */}
                   {!inputValue.trim() && !editingMessage ? (
                     <VoiceRecorder
-                      onSend={(audioBlob, duration) => {
-                        // Handle voice message send
-                        console.log("Voice message:", audioBlob, duration);
-                        // TODO: Upload and send voice message
-                      }}
+                      onSend={sendVoiceMessage}
                       onCancel={() => {
-                        // Handle cancel
+                        // Voice recording cancelled
                       }}
                     />
                   ) : (
@@ -2023,6 +2184,87 @@ function ChatPageContent() {
               </div>
             </div>
           )}
+          </div>
+
+          {/* Online Users Sidebar */}
+          <aside
+            className="hidden lg:flex flex-col border-l"
+            style={{
+              backgroundColor: TELEGRAM_COLORS.secondaryBg,
+              borderColor: TELEGRAM_COLORS.border,
+            }}
+          >
+            <div
+              className="p-4 font-semibold"
+              style={{
+                color: TELEGRAM_COLORS.text,
+                borderBottom: `1px solid ${TELEGRAM_COLORS.border}`,
+              }}
+            >
+              Online Users ({onlineUsers.length})
+            </div>
+            <div className="flex-1 overflow-y-auto p-3 space-y-2">
+              {onlineUsers.length === 0 ? (
+                <div className="text-center text-sm py-8" style={{ color: TELEGRAM_COLORS.hint }}>
+                  No users online
+                </div>
+              ) : (
+                onlineUsers.map((user) => (
+                  <button
+                    key={user.id}
+                    onClick={() => {
+                      setSelectedProfileUser({
+                        id: user.userId,
+                        name: user.userName,
+                        image: user.userAvatar,
+                      });
+                      setShowUserProfile(true);
+                    }}
+                    className="w-full flex items-center gap-3 p-2 rounded-lg hover:opacity-80 transition-opacity text-left"
+                    style={{ backgroundColor: TELEGRAM_COLORS.bgColor }}
+                  >
+                    <div className="relative flex-shrink-0">
+                      {user.userAvatar ? (
+                        <img src={user.userAvatar} alt="" className="w-10 h-10 rounded-full" />
+                      ) : (
+                        <div
+                          className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-medium"
+                          style={{ backgroundColor: TELEGRAM_COLORS.secondaryBg, color: TELEGRAM_COLORS.text }}
+                        >
+                          {user.userName[0]?.toUpperCase()}
+                        </div>
+                      )}
+                      <div
+                        className="absolute bottom-0 right-0 w-3 h-3 rounded-full border-2"
+                        style={{
+                          backgroundColor: TELEGRAM_COLORS.online,
+                          borderColor: TELEGRAM_COLORS.secondaryBg,
+                        }}
+                      />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium truncate" style={{ color: TELEGRAM_COLORS.text }}>
+                          {user.userName}
+                        </span>
+                        {user.isVip && (
+                          <span
+                            className="text-xs px-1.5 py-0.5 rounded flex-shrink-0"
+                            style={{ backgroundColor: "rgba(255, 193, 7, 0.2)", color: "#ffc107" }}
+                          >
+                            VIP
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-xs" style={{ color: TELEGRAM_COLORS.hint }}>
+                        {user.status === "online" ? "Online" : getLastSeenText(user.lastSeen)}
+                      </span>
+                    </div>
+                  </button>
+                ))
+              )}
+            </div>
+          </aside>
         </div>
       </div>
 
@@ -2344,6 +2586,14 @@ function ChatPageContent() {
           setSendRequestUserId(null);
         }}
       />
+
+      {/* Image Viewer Modal */}
+      {viewerImageUrl && (
+        <ImageViewer
+          imageUrl={viewerImageUrl}
+          onClose={() => setViewerImageUrl(null)}
+        />
+      )}
     </main>
   );
 }
