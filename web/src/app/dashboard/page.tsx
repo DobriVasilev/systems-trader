@@ -358,14 +358,14 @@ export default function DashboardPage() {
   );
 
   return (
-    <main className="min-h-screen bg-gray-50">
+    <main className="min-h-screen bg-black">
       <AppHeader title="Dashboard" />
 
       {/* Content */}
       <div className="container mx-auto px-4 py-8">
         {/* Welcome */}
         <div className="mb-8">
-          <h1 className="text-2xl font-bold mb-2">
+          <h1 className="text-2xl font-bold text-white mb-2">
             Welcome back, {session?.user?.name?.split(" ")[0] || "Trader"}
           </h1>
           <p className="text-gray-400">
@@ -377,15 +377,15 @@ export default function DashboardPage() {
         <div className="grid gap-4 md:grid-cols-4 mb-8">
           <div className="bg-gray-900 rounded-lg p-4 border border-gray-800">
             <div className="text-gray-400 text-sm mb-1">Total Sessions</div>
-            <div className="text-2xl font-bold">{userSessions.length}</div>
+            <div className="text-2xl font-bold text-white">{userSessions.length}</div>
           </div>
           <div className="bg-gray-900 rounded-lg p-4 border border-gray-800">
             <div className="text-gray-400 text-sm mb-1">Detections Reviewed</div>
-            <div className="text-2xl font-bold">{totalDetections}</div>
+            <div className="text-2xl font-bold text-white">{totalDetections}</div>
           </div>
           <div className="bg-gray-900 rounded-lg p-4 border border-gray-800">
             <div className="text-gray-400 text-sm mb-1">Corrections Made</div>
-            <div className="text-2xl font-bold">{totalCorrections}</div>
+            <div className="text-2xl font-bold text-white">{totalCorrections}</div>
           </div>
           <div className="bg-gray-900 rounded-lg p-4 border border-gray-800">
             <div className="text-gray-400 text-sm mb-1">Accuracy Impact</div>
@@ -398,7 +398,7 @@ export default function DashboardPage() {
         {/* Recent Sessions */}
         <div className="bg-gray-900 rounded-lg border border-gray-800">
           <div className="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
-            <h2 className="font-semibold">Recent Sessions</h2>
+            <h2 className="font-semibold text-white">Recent Sessions</h2>
             <Link
               href="/sessions"
               className="text-sm text-blue-400 hover:text-blue-300 transition-colors"
@@ -437,7 +437,7 @@ export default function DashboardPage() {
                       s.status === "completed" ? "bg-blue-500" : "bg-gray-500"
                     }`} />
                     <div className="min-w-0">
-                      <div className="font-medium truncate">{s.name}</div>
+                      <div className="font-medium text-white truncate">{s.name}</div>
                       <div className="text-sm text-gray-500">
                         {s.symbol}/{s.timeframe.toUpperCase()} - {s._count?.detections || 0} detections
                       </div>
@@ -495,7 +495,7 @@ export default function DashboardPage() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
               </svg>
             </div>
-            <div className="font-medium mb-1">New Session</div>
+            <div className="font-medium text-white mb-1">New Session</div>
             <div className="text-sm text-gray-500">Start validating patterns on a new chart</div>
           </Link>
 
@@ -508,7 +508,7 @@ export default function DashboardPage() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
               </svg>
             </div>
-            <div className="font-medium mb-1">Browse Sessions</div>
+            <div className="font-medium text-white mb-1">Browse Sessions</div>
             <div className="text-sm text-gray-500">View and continue existing sessions</div>
           </Link>
 
@@ -521,7 +521,7 @@ export default function DashboardPage() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
               </svg>
             </div>
-            <div className="font-medium mb-1">Account Settings</div>
+            <div className="font-medium text-white mb-1">Account Settings</div>
             <div className="text-sm text-gray-500">Manage your profile and preferences</div>
           </Link>
         </div>
