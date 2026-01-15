@@ -142,8 +142,8 @@ export async function POST(
           userReasoning: userReasoning || workspace.userReasoning,
           identificationSteps: identificationSteps
             ? JSON.stringify(identificationSteps)
-            : workspace.identificationSteps,
-          attachments: attachments || workspace.attachments,
+            : (workspace.identificationSteps ?? undefined),
+          attachments: (attachments || workspace.attachments) ?? undefined,
         },
       });
 
