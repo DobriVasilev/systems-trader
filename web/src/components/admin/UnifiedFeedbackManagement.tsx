@@ -15,7 +15,10 @@ import {
   Edit3,
   Trash2,
   Plus,
-  Move
+  Move,
+  Copy,
+  Download,
+  User
 } from "lucide-react";
 
 interface BugFeedback {
@@ -93,6 +96,8 @@ export function UnifiedFeedbackManagement() {
   const [error, setError] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [userFilter, setUserFilter] = useState("all");
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchAllFeedback();
@@ -166,6 +171,131 @@ export function UnifiedFeedbackManagement() {
     setExpandedSessions(newExpanded);
   }
 
+  function generateClaudePrompt(correction: PatternCorrection): string {
+    const typeInfo = CORRECTION_TYPE_LABELS[correction.correctionType] || { label: correction.correctionType };
+    return `# Pattern Correction Feedback
+
+**Session:** ${correction.session.name}
+**Symbol:** ${correction.session.symbol}
+**Timeframe:** ${correction.session.timeframe}
+**User:** ${correction.user.name || "Unknown"} (${correction.user.email})
+
+## Correction Details
+- **Action:** ${typeInfo.label}
+- **Original Type:** ${correction.originalType || "N/A"}
+- **Corrected Type:** ${correction.correctedType || "N/A"}
+
+## Reason
+${correction.reason}
+
+## Task
+Please review this pattern correction and implement the necessary changes to improve pattern detection accuracy.
+
+**Session ID:** ${correction.sessionId}
+**Correction ID:** ${correction.id}
+**Date:** ${new Date(correction.createdAt).toLocaleString()}`;
+  }
+
+  function generateIndicatorPrompt(reasoning: IndicatorReasoning): string {
+    return `# Indicator Reasoning Implementation Request
+
+**Indicator Type:** ${reasoning.indicatorType.replace(/_/g, " ")}
+**Title:** ${reasoning.title}
+**User:** ${reasoning.user.name || "Unknown"} (${reasoning.user.email})
+
+## Description
+${reasoning.description}
+
+## Task
+Please review this indicator reasoning and implement the pattern detection logic.
+
+**Reasoning ID:** ${reasoning.id}
+**Votes:** ${reasoning.votes}
+**Status:** ${reasoning.status}
+**Submitted:** ${new Date(reasoning.createdAt).toLocaleString()}`;
+  }
+
+  async function copyClaudePrompt(id: string, type: "correction" | "reasoning") {
+    try {
+      let prompt = "";
+      if (type === "correction") {
+        const correction = sessionGroups
+          .flatMap(g => g.corrections)
+          .find(c => c.id === id);
+        if (correction) {
+          prompt = generateClaudePrompt(correction);
+        }
+      } else {
+        const reasoning = indicatorReasoning.find(r => r.id === id);
+        if (reasoning) {
+          prompt = generateIndicatorPrompt(reasoning);
+        }
+      }
+
+      await navigator.clipboard.writeText(prompt);
+      setCopiedId(id);
+      setTimeout(() => setCopiedId(null), 2000);
+    } catch (err) {
+      console.error("Failed to copy:", err);
+    }
+  }
+
+  function downloadJSON(data: any, filename: string) {
+    const json = JSON.stringify(data, null, 2);
+    const blob = new Blob([json], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  function downloadAllSessionData() {
+    const data = {
+      exported: new Date().toISOString(),
+      totalSessions: sessionGroups.length,
+      totalCorrections: totalSessionCorrections,
+      sessions: sessionGroups.map(group => ({
+        sessionId: group.sessionId,
+        sessionName: group.sessionName,
+        symbol: group.symbol,
+        timeframe: group.timeframe,
+        corrections: group.corrections.map(c => ({
+          id: c.id,
+          type: c.correctionType,
+          reason: c.reason,
+          status: c.status,
+          user: c.user,
+          originalType: c.originalType,
+          correctedType: c.correctedType,
+          createdAt: c.createdAt,
+        })),
+      })),
+    };
+    downloadJSON(data, `session-corrections-${Date.now()}.json`);
+  }
+
+  function downloadAllIndicatorData() {
+    const data = {
+      exported: new Date().toISOString(),
+      total: indicatorReasoning.length,
+      reasoning: indicatorReasoning,
+    };
+    downloadJSON(data, `indicator-reasoning-${Date.now()}.json`);
+  }
+
+  // Get unique users for filter
+  const uniqueUsers = Array.from(
+    new Set(
+      sessionGroups
+        .flatMap(g => g.corrections)
+        .map(c => c.user.email)
+    )
+  ).sort();
+
   const filteredSessionGroups = sessionGroups.filter((group) => {
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
@@ -179,6 +309,10 @@ export function UnifiedFeedbackManagement() {
     if (statusFilter !== "all") {
       const hasMatchingStatus = group.corrections.some((c) => c.status === statusFilter);
       if (!hasMatchingStatus) return false;
+    }
+    if (userFilter !== "all") {
+      const hasMatchingUser = group.corrections.some((c) => c.user.email === userFilter);
+      if (!hasMatchingUser) return false;
     }
     return true;
   });
@@ -268,7 +402,7 @@ export function UnifiedFeedbackManagement() {
 
             {/* Filters */}
             <div className="bg-gray-900 border border-gray-800 rounded-lg p-4">
-              <div className="flex gap-4">
+              <div className="flex gap-4 mb-4">
                 <div className="flex-1 relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-500" />
                   <input
@@ -282,12 +416,38 @@ export function UnifiedFeedbackManagement() {
                 <select
                   value={statusFilter}
                   onChange={(e) => setStatusFilter(e.target.value)}
-                  className="px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-blue-500"
+                  className="px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-blue-500 min-w-[140px]"
                 >
                   <option value="all">All Status</option>
                   <option value="pending">Pending</option>
                   <option value="resolved">Resolved</option>
                 </select>
+                <select
+                  value={userFilter}
+                  onChange={(e) => setUserFilter(e.target.value)}
+                  className="px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-blue-500 min-w-[200px]"
+                >
+                  <option value="all">All Users</option>
+                  {uniqueUsers.map((email) => (
+                    <option key={email} value={email}>
+                      {email}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  onClick={downloadAllSessionData}
+                  className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors flex items-center gap-2 whitespace-nowrap"
+                >
+                  <Download className="w-4 h-4" />
+                  Download All
+                </button>
+              </div>
+              <div className="flex items-center gap-2 text-xs text-gray-500">
+                <Filter className="w-3 h-3" />
+                <span>
+                  Showing {filteredSessionGroups.length} of {sessionGroups.length} sessions
+                  {userFilter !== "all" && ` • Filtered by user: ${userFilter}`}
+                </span>
               </div>
             </div>
 
@@ -351,6 +511,9 @@ export function UnifiedFeedbackManagement() {
                                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">
                                     Date
                                   </th>
+                                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">
+                                    Actions
+                                  </th>
                                 </tr>
                               </thead>
                               <tbody className="divide-y divide-gray-800">
@@ -382,7 +545,13 @@ export function UnifiedFeedbackManagement() {
                                         </div>
                                       </td>
                                       <td className="px-4 py-3 whitespace-nowrap">
-                                        <div className="text-sm text-gray-400">{correction.user.name || "Unknown"}</div>
+                                        <div className="flex items-center gap-2">
+                                          <User className="w-4 h-4 text-gray-500" />
+                                          <div>
+                                            <div className="text-sm text-white font-medium">{correction.user.name || "Unknown"}</div>
+                                            <div className="text-xs text-gray-500">{correction.user.email}</div>
+                                          </div>
+                                        </div>
                                       </td>
                                       <td className="px-4 py-3 whitespace-nowrap">
                                         <span
@@ -397,6 +566,24 @@ export function UnifiedFeedbackManagement() {
                                       </td>
                                       <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-400">
                                         {new Date(correction.createdAt).toLocaleDateString()}
+                                      </td>
+                                      <td className="px-4 py-3 whitespace-nowrap">
+                                        <button
+                                          onClick={() => copyClaudePrompt(correction.id, "correction")}
+                                          className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs transition-colors flex items-center gap-1.5"
+                                        >
+                                          {copiedId === correction.id ? (
+                                            <>
+                                              <CheckCircle className="w-3 h-3" />
+                                              Copied!
+                                            </>
+                                          ) : (
+                                            <>
+                                              <Copy className="w-3 h-3" />
+                                              Copy Prompt
+                                            </>
+                                          )}
+                                        </button>
                                       </td>
                                     </tr>
                                   );
@@ -424,8 +611,17 @@ export function UnifiedFeedbackManagement() {
 
         {activeTab === "indicators" && (
           <>
-            {/* Submit Button */}
-            <div className="flex justify-end">
+            {/* Action Buttons */}
+            <div className="flex justify-end gap-3">
+              {indicatorReasoning.length > 0 && (
+                <button
+                  onClick={downloadAllIndicatorData}
+                  className="px-6 py-3 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg transition-colors flex items-center gap-2"
+                >
+                  <Download className="w-5 h-5" />
+                  Download All
+                </button>
+              )}
               <Link
                 href="/indicators/submit"
                 className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors flex items-center gap-2"
@@ -473,6 +669,9 @@ export function UnifiedFeedbackManagement() {
                         <th className="px-6 py-4 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
                           Created
                         </th>
+                        <th className="px-6 py-4 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                          Actions
+                        </th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-800">
@@ -516,6 +715,24 @@ export function UnifiedFeedbackManagement() {
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">
                             {new Date(reasoning.createdAt).toLocaleDateString()}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <button
+                              onClick={() => copyClaudePrompt(reasoning.id, "reasoning")}
+                              className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs transition-colors flex items-center gap-1.5"
+                            >
+                              {copiedId === reasoning.id ? (
+                                <>
+                                  <CheckCircle className="w-3 h-3" />
+                                  Copied!
+                                </>
+                              ) : (
+                                <>
+                                  <Copy className="w-3 h-3" />
+                                  Copy Prompt
+                                </>
+                              )}
+                            </button>
                           </td>
                         </tr>
                       ))}

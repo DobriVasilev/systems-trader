@@ -1255,42 +1255,82 @@ model FeedbackComment {
 // ============================================================================
 
 enum IndicatorType {
-  // Price Action Patterns (SOON indicators from screenshot)
-  CHANGE_OF_CHARACTER  // CHoCH
-  TRADING_RANGE
-  FALSE_BREAKOUT
-  LIQUIDITY_SWEEP
-  LIQUIDITY_GRAB
-  STOP_HUNT
-
-  // ICT / Smart Money Concepts
-  FAIR_VALUE_GAP       // FVG
-  PREMIUM_DISCOUNT     // Premium/Discount zones
-  INDUCEMENT
-  ORDER_BLOCK          // OB
-  BREAKER_BLOCK
-  MITIGATION_BLOCK
-
-  // Support & Resistance
-  SUPPORT_RESISTANCE
-  SUPPLY_DEMAND_ZONE
-  KEY_LEVEL
-
-  // Market Structure
-  MARKET_STRUCTURE     // General MS concepts
+  // Price Action (9)
+  SWINGS               // Already implemented (REVIEW)
   BREAK_OF_STRUCTURE   // BOS (already implemented as BETA)
   MARKET_STRUCTURE_BREAK // MSB (already implemented as BETA)
-  SWING_POINTS         // Already implemented (REVIEW)
-  HIGHER_HIGH_LOWER_LOW // HH, HL, LH, LL
+  CHANGE_OF_CHARACTER  // CHoCH (SOON)
+  TRADING_RANGE        // range (SOON)
+  FALSE_BREAKOUT       // false_breakout (SOON)
+  LIQUIDITY_SWEEP      // liquidity_sweep (SOON)
+  LIQUIDITY_GRAB       // liquidity_grab (SOON)
+  STOP_HUNT            // stop_hunt (SOON)
 
-  // Trend & Momentum
-  TREND_LINE
-  CHANNEL
-  FIBONACCI_LEVELS
+  // Support & Resistance (3)
+  SUPPORT_RESISTANCE   // support_resistance (SOON)
+  PIVOT_POINTS         // pivot_points (SOON)
+  PSYCHOLOGICAL_LEVELS // psychological_levels (SOON)
 
-  // Volume & Liquidity
-  VOLUME_PROFILE
-  LIQUIDITY_VOID
+  // Order Blocks / ICT (4)
+  ORDER_BLOCK          // order_block (SOON)
+  BREAKER_BLOCK        // breaker_block (SOON)
+  MITIGATION_BLOCK     // mitigation_block (SOON)
+  REJECTION_BLOCK      // rejection_block (SOON)
+
+  // Fair Value Gaps (3)
+  FAIR_VALUE_GAP       // fvg (SOON)
+  BISI                 // BISI - Buyside Imbalance Sellside Inefficiency (SOON)
+  SIBI                 // SIBI - Sellside Imbalance Buyside Inefficiency (SOON)
+
+  // Supply & Demand (3)
+  SUPPLY_ZONE          // supply_zone (SOON)
+  DEMAND_ZONE          // demand_zone (SOON)
+  IMBALANCE            // imbalance (SOON)
+
+  // Fibonacci (3)
+  FIBONACCI_RETRACEMENT // fibonacci_retracement (SOON)
+  FIBONACCI_EXTENSION   // fibonacci_extension (SOON)
+  FIBONACCI_TIME        // fibonacci_time (SOON)
+
+  // Trend Analysis (4)
+  TREND_LINES          // trend_lines (SOON)
+  CHANNELS             // channels (SOON)
+  WEDGES               // wedges (SOON)
+  TRIANGLES            // triangles (SOON)
+
+  // Classic Patterns (7)
+  HEAD_SHOULDERS       // head_shoulders (SOON)
+  DOUBLE_TOP           // double_top (SOON)
+  DOUBLE_BOTTOM        // double_bottom (SOON)
+  TRIPLE_TOP           // triple_top (SOON)
+  TRIPLE_BOTTOM        // triple_bottom (SOON)
+  CUP_HANDLE           // cup_handle (SOON)
+  FLAGS_PENNANTS       // flags + pennants (SOON)
+
+  // Candlestick Patterns (11)
+  ENGULFING            // engulfing (SOON)
+  DOJI                 // doji (SOON)
+  HAMMER               // hammer (SOON)
+  SHOOTING_STAR        // shooting_star (SOON)
+  MORNING_STAR         // morning_star (SOON)
+  EVENING_STAR         // evening_star (SOON)
+  THREE_WHITE_SOLDIERS // three_white_soldiers (SOON)
+  THREE_BLACK_CROWS    // three_black_crows (SOON)
+  HARAMI               // harami (SOON)
+  PIERCING_LINE        // piercing_line (SOON)
+  DARK_CLOUD_COVER     // dark_cloud_cover (SOON)
+
+  // Volume Analysis (3)
+  VOLUME_PROFILE       // volume_profile (SOON)
+  VOLUME_DIVERGENCE    // volume_divergence (SOON)
+  VOLUME_CLIMAX        // volume_climax (SOON)
+
+  // Indicators (5)
+  MA_CROSSOVER         // ma_crossover (SOON)
+  RSI_DIVERGENCE       // rsi_divergence (SOON)
+  MACD_SIGNAL          // macd_signal (SOON)
+  BOLLINGER_BANDS      // bollinger_bands (SOON)
+  VWAP                 // vwap (SOON)
 
   // Other
   OTHER

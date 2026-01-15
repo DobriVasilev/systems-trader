@@ -3,12 +3,19 @@ import { auth } from "@/lib/auth";
 import { AppHeader } from "@/components/layout/AppHeader";
 import { IndicatorReasoningForm } from "@/components/indicators/IndicatorReasoningForm";
 
-export default async function SubmitIndicatorReasoningPage() {
+export default async function SubmitIndicatorReasoningPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ type?: string }>;
+}) {
   const session = await auth();
 
   if (!session?.user) {
     redirect("/auth/login");
   }
+
+  const params = await searchParams;
+  const prefilledType = params.type;
 
   return (
     <div className="min-h-screen bg-black">
@@ -23,7 +30,7 @@ export default async function SubmitIndicatorReasoningPage() {
             Your reasoning will be reviewed and potentially implemented into the system.
           </p>
         </div>
-        <IndicatorReasoningForm userId={session.user.id} />
+        <IndicatorReasoningForm userId={session.user.id} prefilledType={prefilledType} />
       </div>
     </div>
   );

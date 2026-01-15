@@ -370,6 +370,69 @@ function StatusBadge({ status }: { status?: PatternConfig["status"] }) {
   );
 }
 
+// Helper to map PatternType to IndicatorType enum
+function patternTypeToIndicatorType(patternValue: string): string {
+  const mapping: Record<string, string> = {
+    swings: "SWINGS",
+    bos: "BREAK_OF_STRUCTURE",
+    msb: "MARKET_STRUCTURE_BREAK",
+    choch: "CHANGE_OF_CHARACTER",
+    range: "TRADING_RANGE",
+    false_breakout: "FALSE_BREAKOUT",
+    liquidity_sweep: "LIQUIDITY_SWEEP",
+    liquidity_grab: "LIQUIDITY_GRAB",
+    stop_hunt: "STOP_HUNT",
+    support_resistance: "SUPPORT_RESISTANCE",
+    pivot_points: "PIVOT_POINTS",
+    psychological_levels: "PSYCHOLOGICAL_LEVELS",
+    order_block: "ORDER_BLOCK",
+    breaker_block: "BREAKER_BLOCK",
+    mitigation_block: "MITIGATION_BLOCK",
+    rejection_block: "REJECTION_BLOCK",
+    fvg: "FAIR_VALUE_GAP",
+    bisi: "BISI",
+    sibi: "SIBI",
+    supply_zone: "SUPPLY_ZONE",
+    demand_zone: "DEMAND_ZONE",
+    imbalance: "IMBALANCE",
+    fibonacci_retracement: "FIBONACCI_RETRACEMENT",
+    fibonacci_extension: "FIBONACCI_EXTENSION",
+    fibonacci_time: "FIBONACCI_TIME",
+    trend_lines: "TREND_LINES",
+    channels: "CHANNELS",
+    wedges: "WEDGES",
+    triangles: "TRIANGLES",
+    head_shoulders: "HEAD_SHOULDERS",
+    double_top: "DOUBLE_TOP",
+    double_bottom: "DOUBLE_BOTTOM",
+    triple_top: "TRIPLE_TOP",
+    triple_bottom: "TRIPLE_BOTTOM",
+    cup_handle: "CUP_HANDLE",
+    flags: "FLAGS",
+    pennants: "PENNANTS",
+    engulfing: "ENGULFING",
+    doji: "DOJI",
+    hammer: "HAMMER",
+    shooting_star: "SHOOTING_STAR",
+    morning_star: "MORNING_STAR",
+    evening_star: "EVENING_STAR",
+    three_white_soldiers: "THREE_WHITE_SOLDIERS",
+    three_black_crows: "THREE_BLACK_CROWS",
+    harami: "HARAMI",
+    piercing_line: "PIERCING_LINE",
+    dark_cloud_cover: "DARK_CLOUD_COVER",
+    volume_profile: "VOLUME_PROFILE",
+    volume_divergence: "VOLUME_DIVERGENCE",
+    volume_climax: "VOLUME_CLIMAX",
+    ma_crossover: "MA_CROSSOVER",
+    rsi_divergence: "RSI_DIVERGENCE",
+    macd_signal: "MACD_SIGNAL",
+    bollinger_bands: "BOLLINGER_BANDS",
+    vwap: "VWAP",
+  };
+  return mapping[patternValue] || "OTHER";
+}
+
 // Pattern option component
 function PatternOption({
   config,
@@ -385,46 +448,65 @@ function PatternOption({
   const category = PATTERN_CATEGORIES[config.category as CategoryKey];
   // Only disable patterns that are not implemented (coming_soon or no status)
   const isDisabled = !config.status || config.status === "coming_soon";
+  const isSoon = isDisabled;
 
   return (
-    <button
-      onClick={onSelect}
-      disabled={isDisabled}
-      className={`w-full flex items-start gap-2 px-2 py-1.5 rounded text-left
-               transition-colors ${isSelected ? "bg-blue-600/20 border border-blue-500/30" : ""}
-               ${isDisabled ? "opacity-50 cursor-not-allowed" : "hover:bg-gray-800"}`}
-    >
-      {!compact && (
-        <div
-          className="w-2.5 h-2.5 rounded-full mt-1 flex-shrink-0"
-          style={{ backgroundColor: category?.color || "#666" }}
-        />
-      )}
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2">
-          <span className={`font-medium ${compact ? "text-xs" : "text-sm"} ${isSelected ? "text-blue-400" : ""}`}>
-            {config.label}
-          </span>
-          <StatusBadge status={config.status} />
-          {config.settings && config.settings.length > 0 && !isDisabled && (
-            <svg className="w-3 h-3 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
-              />
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
-          )}
+    <div className="relative group">
+      <button
+        onClick={onSelect}
+        disabled={isDisabled}
+        className={`w-full flex items-start gap-2 px-2 py-1.5 rounded text-left
+                 transition-colors ${isSelected ? "bg-blue-600/20 border border-blue-500/30" : ""}
+                 ${isDisabled ? "opacity-50 cursor-not-allowed" : "hover:bg-gray-800"}`}
+      >
+        {!compact && (
+          <div
+            className="w-2.5 h-2.5 rounded-full mt-1 flex-shrink-0"
+            style={{ backgroundColor: category?.color || "#666" }}
+          />
+        )}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <span className={`font-medium ${compact ? "text-xs" : "text-sm"} ${isSelected ? "text-blue-400" : ""}`}>
+              {config.label}
+            </span>
+            <StatusBadge status={config.status} />
+            {config.settings && config.settings.length > 0 && !isDisabled && (
+              <svg className="w-3 h-3 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+                />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+            )}
+          </div>
+          {!compact && <p className="text-xs text-gray-500 truncate">{config.description}</p>}
         </div>
-        {!compact && <p className="text-xs text-gray-500 truncate">{config.description}</p>}
-      </div>
-      {isSelected && (
-        <svg className="w-4 h-4 text-blue-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-        </svg>
+        {isSelected && (
+          <svg className="w-4 h-4 text-blue-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+          </svg>
+        )}
+      </button>
+
+      {/* Give Feedback button for SOON patterns */}
+      {isSoon && !compact && (
+        <a
+          href={`/indicators/submit?type=${patternTypeToIndicatorType(config.value)}`}
+          onClick={(e) => e.stopPropagation()}
+          className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity
+                     px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-medium rounded
+                     flex items-center gap-1 whitespace-nowrap z-10"
+        >
+          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
+          </svg>
+          Give Feedback
+        </a>
       )}
-    </button>
+    </div>
   );
 }

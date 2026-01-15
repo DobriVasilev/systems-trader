@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   Upload,
@@ -15,10 +15,14 @@ import {
 
 interface IndicatorReasoningFormProps {
   userId: string;
+  prefilledType?: string;
 }
 
 const INDICATOR_TYPES = [
-  // Price Action Patterns
+  // Price Action (9)
+  { value: "SWINGS", label: "Swings", description: "Swing highs and lows in price action", category: "Price Action" },
+  { value: "BREAK_OF_STRUCTURE", label: "Break of Structure (BOS)", description: "Price breaks through market structure", category: "Price Action" },
+  { value: "MARKET_STRUCTURE_BREAK", label: "Market Structure Break (MSB)", description: "Significant market structure break", category: "Price Action" },
   { value: "CHANGE_OF_CHARACTER", label: "Change of Character (CHoCH)", description: "Market changes from bullish to bearish or vice versa", category: "Price Action" },
   { value: "TRADING_RANGE", label: "Trading Range", description: "Sideways price movement between support and resistance", category: "Price Action" },
   { value: "FALSE_BREAKOUT", label: "False Breakout", description: "Price breaks a level but quickly reverses", category: "Price Action" },
@@ -26,43 +30,81 @@ const INDICATOR_TYPES = [
   { value: "LIQUIDITY_GRAB", label: "Liquidity Grab", description: "Market grabs liquidity before moving", category: "Price Action" },
   { value: "STOP_HUNT", label: "Stop Hunt", description: "Market deliberately triggers stops before reversal", category: "Price Action" },
 
-  // ICT / Smart Money Concepts
-  { value: "FAIR_VALUE_GAP", label: "Fair Value Gap (FVG)", description: "Imbalance in price that tends to get filled", category: "ICT/SMC" },
-  { value: "PREMIUM_DISCOUNT", label: "Premium/Discount Zones", description: "Areas where price is overextended", category: "ICT/SMC" },
-  { value: "INDUCEMENT", label: "Inducement", description: "Price action designed to trap traders", category: "ICT/SMC" },
-  { value: "ORDER_BLOCK", label: "Order Block (OB)", description: "Institutional buying/selling zones", category: "ICT/SMC" },
-  { value: "BREAKER_BLOCK", label: "Breaker Block", description: "Failed order block that becomes opposite", category: "ICT/SMC" },
-  { value: "MITIGATION_BLOCK", label: "Mitigation Block", description: "Area where imbalance gets mitigated", category: "ICT/SMC" },
+  // Support & Resistance (3)
+  { value: "SUPPORT_RESISTANCE", label: "Support & Resistance", description: "Key price levels where reversals occur", category: "Support & Resistance" },
+  { value: "PIVOT_POINTS", label: "Pivot Points", description: "Calculated support/resistance levels", category: "Support & Resistance" },
+  { value: "PSYCHOLOGICAL_LEVELS", label: "Psychological Levels", description: "Round number price levels (e.g., $50,000)", category: "Support & Resistance" },
 
-  // Support & Resistance
-  { value: "SUPPORT_RESISTANCE", label: "Support & Resistance", description: "Key price levels where reversals occur", category: "S&R" },
-  { value: "SUPPLY_DEMAND_ZONE", label: "Supply/Demand Zone", description: "Areas of significant buying/selling pressure", category: "S&R" },
-  { value: "KEY_LEVEL", label: "Key Level", description: "Important psychological or technical price level", category: "S&R" },
+  // Order Blocks / ICT (4)
+  { value: "ORDER_BLOCK", label: "Order Block (OB)", description: "Institutional buying/selling zones", category: "Order Blocks" },
+  { value: "BREAKER_BLOCK", label: "Breaker Block", description: "Failed order block that becomes opposite", category: "Order Blocks" },
+  { value: "MITIGATION_BLOCK", label: "Mitigation Block", description: "Area where imbalance gets mitigated", category: "Order Blocks" },
+  { value: "REJECTION_BLOCK", label: "Rejection Block", description: "Zone where price was rejected", category: "Order Blocks" },
 
-  // Market Structure
-  { value: "MARKET_STRUCTURE", label: "Market Structure", description: "General market structure concepts", category: "Structure" },
-  { value: "BREAK_OF_STRUCTURE", label: "Break of Structure (BOS)", description: "Price breaks through structure", category: "Structure" },
-  { value: "MARKET_STRUCTURE_BREAK", label: "Market Structure Break (MSB)", description: "Significant structure break", category: "Structure" },
-  { value: "SWING_POINTS", label: "Swing Points", description: "Swing highs and swing lows", category: "Structure" },
-  { value: "HIGHER_HIGH_LOWER_LOW", label: "HH/HL/LH/LL", description: "Market structure patterns", category: "Structure" },
+  // Fair Value Gaps (3)
+  { value: "FAIR_VALUE_GAP", label: "Fair Value Gap (FVG)", description: "Imbalance in price that tends to get filled", category: "Fair Value Gaps" },
+  { value: "BISI", label: "BISI", description: "Buyside Imbalance Sellside Inefficiency", category: "Fair Value Gaps" },
+  { value: "SIBI", label: "SIBI", description: "Sellside Imbalance Buyside Inefficiency", category: "Fair Value Gaps" },
 
-  // Trend & Momentum
-  { value: "TREND_LINE", label: "Trend Line", description: "Line connecting highs or lows", category: "Trend" },
-  { value: "CHANNEL", label: "Channel", description: "Parallel trend lines", category: "Trend" },
-  { value: "FIBONACCI_LEVELS", label: "Fibonacci Levels", description: "Fib retracements and extensions", category: "Trend" },
+  // Supply & Demand (3)
+  { value: "SUPPLY_ZONE", label: "Supply Zone", description: "Area of strong selling pressure", category: "Supply & Demand" },
+  { value: "DEMAND_ZONE", label: "Demand Zone", description: "Area of strong buying pressure", category: "Supply & Demand" },
+  { value: "IMBALANCE", label: "Imbalance", description: "Price inefficiency or gap in the market", category: "Supply & Demand" },
 
-  // Volume & Liquidity
-  { value: "VOLUME_PROFILE", label: "Volume Profile", description: "Volume distribution at price levels", category: "Volume" },
-  { value: "LIQUIDITY_VOID", label: "Liquidity Void", description: "Area with little to no liquidity", category: "Volume" },
+  // Fibonacci (3)
+  { value: "FIBONACCI_RETRACEMENT", label: "Fibonacci Retracement", description: "Fib levels for retracement targets", category: "Fibonacci" },
+  { value: "FIBONACCI_EXTENSION", label: "Fibonacci Extension", description: "Fib levels for extension targets", category: "Fibonacci" },
+  { value: "FIBONACCI_TIME", label: "Fibonacci Time Zones", description: "Time-based Fibonacci analysis", category: "Fibonacci" },
+
+  // Trend Analysis (4)
+  { value: "TREND_LINES", label: "Trend Lines", description: "Lines connecting highs or lows", category: "Trend Analysis" },
+  { value: "CHANNELS", label: "Channels", description: "Parallel trend lines forming channel", category: "Trend Analysis" },
+  { value: "WEDGES", label: "Wedges", description: "Converging trend lines (rising/falling wedge)", category: "Trend Analysis" },
+  { value: "TRIANGLES", label: "Triangles", description: "Symmetrical, ascending, or descending triangles", category: "Trend Analysis" },
+
+  // Classic Patterns (8)
+  { value: "HEAD_SHOULDERS", label: "Head & Shoulders", description: "Reversal pattern with three peaks", category: "Classic Patterns" },
+  { value: "DOUBLE_TOP", label: "Double Top", description: "Bearish reversal with two peaks", category: "Classic Patterns" },
+  { value: "DOUBLE_BOTTOM", label: "Double Bottom", description: "Bullish reversal with two troughs", category: "Classic Patterns" },
+  { value: "TRIPLE_TOP", label: "Triple Top", description: "Bearish reversal with three peaks", category: "Classic Patterns" },
+  { value: "TRIPLE_BOTTOM", label: "Triple Bottom", description: "Bullish reversal with three troughs", category: "Classic Patterns" },
+  { value: "CUP_HANDLE", label: "Cup & Handle", description: "Bullish continuation pattern", category: "Classic Patterns" },
+  { value: "FLAGS", label: "Flags", description: "Short-term continuation pattern", category: "Classic Patterns" },
+  { value: "PENNANTS", label: "Pennants", description: "Small symmetrical triangle continuation", category: "Classic Patterns" },
+
+  // Candlestick Patterns (11)
+  { value: "ENGULFING", label: "Engulfing", description: "Bullish or bearish engulfing candle", category: "Candlestick Patterns" },
+  { value: "DOJI", label: "Doji", description: "Indecision candle with small body", category: "Candlestick Patterns" },
+  { value: "HAMMER", label: "Hammer", description: "Bullish reversal with long lower wick", category: "Candlestick Patterns" },
+  { value: "SHOOTING_STAR", label: "Shooting Star", description: "Bearish reversal with long upper wick", category: "Candlestick Patterns" },
+  { value: "MORNING_STAR", label: "Morning Star", description: "Three-candle bullish reversal", category: "Candlestick Patterns" },
+  { value: "EVENING_STAR", label: "Evening Star", description: "Three-candle bearish reversal", category: "Candlestick Patterns" },
+  { value: "THREE_WHITE_SOLDIERS", label: "Three White Soldiers", description: "Three consecutive bullish candles", category: "Candlestick Patterns" },
+  { value: "THREE_BLACK_CROWS", label: "Three Black Crows", description: "Three consecutive bearish candles", category: "Candlestick Patterns" },
+  { value: "HARAMI", label: "Harami", description: "Small candle inside previous candle", category: "Candlestick Patterns" },
+  { value: "PIERCING_LINE", label: "Piercing Line", description: "Bullish reversal piercing prior candle", category: "Candlestick Patterns" },
+  { value: "DARK_CLOUD_COVER", label: "Dark Cloud Cover", description: "Bearish reversal covering prior candle", category: "Candlestick Patterns" },
+
+  // Volume Analysis (3)
+  { value: "VOLUME_PROFILE", label: "Volume Profile", description: "Volume distribution at price levels", category: "Volume Analysis" },
+  { value: "VOLUME_DIVERGENCE", label: "Volume Divergence", description: "Price and volume moving in opposite directions", category: "Volume Analysis" },
+  { value: "VOLUME_CLIMAX", label: "Volume Climax", description: "Extreme volume spike indicating exhaustion", category: "Volume Analysis" },
+
+  // Indicators (5)
+  { value: "MA_CROSSOVER", label: "Moving Average Crossover", description: "MA lines crossing signals", category: "Technical Indicators" },
+  { value: "RSI_DIVERGENCE", label: "RSI Divergence", description: "RSI and price divergence", category: "Technical Indicators" },
+  { value: "MACD_SIGNAL", label: "MACD Signal", description: "MACD line crosses signal line", category: "Technical Indicators" },
+  { value: "BOLLINGER_BANDS", label: "Bollinger Bands", description: "Volatility bands around price", category: "Technical Indicators" },
+  { value: "VWAP", label: "VWAP", description: "Volume Weighted Average Price", category: "Technical Indicators" },
 
   // Other
-  { value: "OTHER", label: "Other", description: "Another pattern type", category: "Other" },
+  { value: "OTHER", label: "Other", description: "Another pattern type not listed", category: "Other" },
 ];
 
 const TIMEFRAMES = ["1m", "5m", "15m", "30m", "1h", "4h", "12h", "1d", "1w"];
 const SYMBOLS = ["BTC", "ETH", "SOL", "DOGE", "XRP", "HYPE", "AVAX", "LINK", "ARB", "OP"];
 
-export function IndicatorReasoningForm({ userId }: IndicatorReasoningFormProps) {
+export function IndicatorReasoningForm({ userId, prefilledType }: IndicatorReasoningFormProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -82,6 +124,17 @@ export function IndicatorReasoningForm({ userId }: IndicatorReasoningFormProps) 
   const [screenshots, setScreenshots] = useState<File[]>([]);
   const [videos, setVideos] = useState<File[]>([]);
   const [recording, setRecording] = useState(false);
+
+  // Set pre-filled type on mount
+  useEffect(() => {
+    if (prefilledType) {
+      // Validate that the type exists in our INDICATOR_TYPES array
+      const typeExists = INDICATOR_TYPES.some(t => t.value === prefilledType);
+      if (typeExists) {
+        setIndicatorType(prefilledType);
+      }
+    }
+  }, [prefilledType]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
