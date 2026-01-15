@@ -11,6 +11,8 @@ import {
   TrendingUp,
   Settings,
   Database,
+  Bot,
+  BarChart3,
 } from "lucide-react";
 
 interface SystemHealth {
@@ -135,7 +137,7 @@ export function AdminDashboard() {
           </Link>
 
           <Link
-            href="/feedback"
+            href="/admin/feedback"
             className="bg-gray-900 border border-gray-800 rounded-lg p-6 hover:border-green-600 transition-colors group"
           >
             <div className="flex items-center gap-4">
@@ -144,7 +146,37 @@ export function AdminDashboard() {
               </div>
               <div>
                 <h3 className="font-semibold text-white">Feedback Management</h3>
-                <p className="text-sm text-gray-400">View all feedback</p>
+                <p className="text-sm text-gray-400">View and manage all feedback submissions</p>
+              </div>
+            </div>
+          </Link>
+
+          <Link
+            href="/sessions"
+            className="bg-gray-900 border border-gray-800 rounded-lg p-6 hover:border-orange-600 transition-colors group"
+          >
+            <div className="flex items-center gap-4">
+              <div className="p-3 bg-orange-600/20 rounded-lg group-hover:bg-orange-600/30 transition-colors">
+                <BarChart3 className="w-6 h-6 text-orange-400" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-white">Sessions Management</h3>
+                <p className="text-sm text-gray-400">View and monitor all trading sessions</p>
+              </div>
+            </div>
+          </Link>
+
+          <Link
+            href="/bots"
+            className="bg-gray-900 border border-gray-800 rounded-lg p-6 hover:border-cyan-600 transition-colors group"
+          >
+            <div className="flex items-center gap-4">
+              <div className="p-3 bg-cyan-600/20 rounded-lg group-hover:bg-cyan-600/30 transition-colors">
+                <Bot className="w-6 h-6 text-cyan-400" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-white">Bots Management</h3>
+                <p className="text-sm text-gray-400">Control and configure trading bots</p>
               </div>
             </div>
           </Link>
