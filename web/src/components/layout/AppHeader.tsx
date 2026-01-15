@@ -8,9 +8,10 @@ import { useState, useRef, useEffect } from "react";
 interface AppHeaderProps {
   title?: string;
   showNav?: boolean;
+  showBackButton?: boolean;
 }
 
-export function AppHeader({ title, showNav = true }: AppHeaderProps) {
+export function AppHeader({ title, showNav = true, showBackButton = false }: AppHeaderProps) {
   const pathname = usePathname();
   const { data: session } = useSession();
   const [showDropdown, setShowDropdown] = useState(false);
@@ -49,6 +50,17 @@ export function AppHeader({ title, showNav = true }: AppHeaderProps) {
         <div className="flex items-center justify-between h-16">
           {/* Logo and Title */}
           <div className="flex items-center gap-4">
+            {showBackButton && (
+              <button
+                onClick={() => window.history.back()}
+                className="p-2 hover:bg-gray-800 rounded-lg transition-colors text-gray-400 hover:text-white"
+                aria-label="Go back"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+              </button>
+            )}
             <Link href="/dashboard" className="flex items-center gap-2">
               <img
                 src="https://pub-5cc5403568f5455a945da44f4db19f23.r2.dev/systems_trader_logo.png"
