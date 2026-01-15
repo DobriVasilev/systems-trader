@@ -3,84 +3,55 @@
 /**
  * Workspace Status Watcher
  *
- * Watches /tmp/claude-workspace/status/ for Claude execution status updates
+ * Watches /tmp/claude-workspace/status directory for status updates from Claude Code
  * Updates ClaudeExecution records and creates WorkspaceMessage timeline entries
  *
  * Run with: npm run watch:workspace-status
  */
 
-import { watch } from "fs";
-import { readFile, writeFile } from "fs/promises";
-import { existsSync } from "fs";
-import path from "path";
 import { PrismaClient } from "@prisma/client";
+import * as fs from "fs";
+import * as path from "path";
+import { watch } from "fs";
 
 const prisma = new PrismaClient();
 
 // Configuration
-const STATUS_DIR = "/tmp/claude-workspace/status";
-const HEARTBEAT_FILE = "/tmp/workspace-status-watcher-heartbeat.txt";
-const MAX_RUNTIME = 30 * 60 * 1000; // 30 minutes max runtime
+const WORKSPACE_DIR = "/tmp/claude-workspace";
+const STATUS_DIR = path.join(WORKSPACE_DIR, "status");
+const POLL_INTERVAL = 2000; // Check every 2 seconds for file changes
 
-// Track health
-let lastHeartbeat = Date.now();
-let startTime = Date.now();
-
-// Write heartbeat
-async function updateHeartbeat() {
-  try {
-    await writeFile(HEARTBEAT_FILE, Date.now().toString());
-    lastHeartbeat = Date.now();
-  } catch (error) {
-    console.error("[ERROR] Failed to write heartbeat:", error);
+// Ensure status directory exists
+function ensureStatusDirectory() {
+  if (!fs.existsSync(STATUS_DIR)) {
+    fs.mkdirSync(STATUS_DIR, { recursive: true });
   }
 }
 
-// Freeze detection
-function checkForFreeze() {
-  const now = Date.now();
-  const timeSinceLastHeartbeat = now - lastHeartbeat;
-
-  if (timeSinceLastHeartbeat > 60000) {
-    console.error(
-      `[FREEZE DETECTED] No heartbeat for ${timeSinceLastHeartbeat}ms`
-    );
-    process.exit(1);
-  }
-
-  if (now - startTime > MAX_RUNTIME) {
-    console.log(
-      `[MAX RUNTIME] Watcher has run for ${MAX_RUNTIME}ms. Exiting for restart.`
-    );
-    process.exit(0);
-  }
-}
-
-// Process status update
+// Process a status update file
 async function processStatusUpdate(filename: string) {
-  try {
-    const statusPath = path.join(STATUS_DIR, filename);
+  const filePath = path.join(STATUS_DIR, filename);
 
-    // Parse execution ID from filename: execution-{id}.json
-    const match = filename.match(/^execution-(.+)\.json$/);
-    if (!match) {
-      console.log(`[SKIP] Invalid filename format: ${filename}`);
+  try {
+    console.log(`[${new Date().toISOString()}] Processing status update: ${filename}`);
+
+    // Read status file
+    const content = fs.readFileSync(filePath, "utf8");
+    const statusData = JSON.parse(content);
+
+    const { executionId, status, phase, progress, data, error } = statusData;
+
+    if (!executionId) {
+      console.error(`[ERROR] Status file missing executionId: ${filename}`);
       return;
     }
 
-    const executionId = match[1];
-    console.log(`[STATUS UPDATE] Execution: ${executionId}`);
-
-    // Read status file
-    const statusData = JSON.parse(await readFile(statusPath, "utf-8"));
-    console.log(
-      `[DATA] Status: ${statusData.status}, Phase: ${statusData.phase || "N/A"}, Progress: ${statusData.progress || 0}%`
-    );
-
-    // Find existing execution
+    // Find execution
     const execution = await prisma.claudeExecution.findUnique({
       where: { id: executionId },
-      include: { workspace: true },
+      include: {
+        workspace: true,
+      },
     });
 
     if (!execution) {
@@ -88,40 +59,27 @@ async function processStatusUpdate(filename: string) {
       return;
     }
 
+    console.log(`[UPDATE] Execution ${executionId}: ${status} - ${phase || "N/A"} - ${progress || 0}%`);
+
     // Update execution record
-    const updateData: any = {
-      status: statusData.status,
-      phase: statusData.phase || execution.phase,
-      progress: statusData.progress || execution.progress,
-    };
+    const updateData: any = {};
 
-    // Handle completed status
-    if (statusData.status === "completed") {
-      updateData.completedAt = new Date();
-      if (statusData.filesChanged) {
-        updateData.filesChanged = statusData.filesChanged;
-      }
-      if (statusData.commitHash) {
-        updateData.commitHash = statusData.commitHash;
-      }
-      if (statusData.commitMessage) {
-        updateData.commitMessage = statusData.commitMessage;
-      }
-    }
-
-    // Handle failed status
-    if (statusData.status === "failed") {
-      updateData.error = statusData.error || "Unknown error";
+    if (status) updateData.status = status;
+    if (phase) updateData.phase = phase;
+    if (progress !== undefined) updateData.progress = progress;
+    if (error) {
+      updateData.error = error;
       updateData.erroredAt = new Date();
     }
 
-    // Handle deploy status
-    if (statusData.deployStatus) {
-      updateData.deployStatus = statusData.deployStatus;
-      if (statusData.deployStatus === "ready") {
-        updateData.deployCompletedAt = new Date();
-        updateData.deployUrl = statusData.deployUrl;
-      }
+    // Handle completion
+    if (status === "completed") {
+      updateData.completedAt = new Date();
+      updateData.progress = 100;
+
+      if (data?.filesChanged) updateData.filesChanged = data.filesChanged;
+      if (data?.commitHash) updateData.commitHash = data.commitHash;
+      if (data?.commitMessage) updateData.commitMessage = data.commitMessage;
     }
 
     await prisma.claudeExecution.update({
@@ -129,147 +87,168 @@ async function processStatusUpdate(filename: string) {
       data: updateData,
     });
 
-    console.log(`[DATABASE] Updated execution: ${executionId}`);
+    // Create workspace message
+    const messageData: any = {
+      workspaceId: execution.workspaceId,
+      executionId: executionId,
+      authorType: "claude",
+    };
 
-    // Create timeline message based on status
-    let messageType: string | null = null;
-    let messageContent: string | null = null;
-    let messageData: any = {};
+    if (status === "running" && phase) {
+      messageData.type = "execution_phase_changed";
+      messageData.title = `Phase: ${phase}`;
+      messageData.content = `Execution entered ${phase} phase`;
+      messageData.data = { phase, progress: progress || 0 };
+      messageData.progress = progress || 0;
+    } else if (status === "completed") {
+      messageData.type = "execution_completed";
+      messageData.title = "Implementation Complete";
+      messageData.content = data?.commitMessage || "Changes implemented successfully";
+      messageData.data = {
+        filesChanged: data?.filesChanged || [],
+        commitHash: data?.commitHash,
+      };
+      messageData.progress = 100;
 
-    if (statusData.status === "running" && statusData.phase) {
-      // Phase update
-      messageType = "claude_phase_update";
-      messageContent = `Claude is ${statusData.phase}`;
-      messageData = {
-        executionId,
-        phase: statusData.phase,
-        phaseStartedAt: new Date(),
-        currentTask: statusData.currentTask,
-      };
-    } else if (statusData.status === "completed") {
-      // Completion
-      messageType = "claude_completed";
-      messageContent = "Claude completed the implementation";
-      messageData = {
-        executionId,
-        duration: Math.floor(
-          (new Date().getTime() - execution.triggeredAt.getTime()) / 1000
-        ),
-        filesChanged: statusData.filesChanged || [],
-        commitHash: statusData.commitHash,
-        commitMessage: statusData.commitMessage,
-      };
-    } else if (statusData.status === "failed") {
-      // Failure
-      messageType = "claude_failed";
-      messageContent = `Claude failed: ${statusData.error || "Unknown error"}`;
-      messageData = {
-        executionId,
-        error: statusData.error || "Unknown error",
-        phase: execution.phase || "unknown",
-        willRetry: execution.retryCount < execution.maxRetries,
-        retryCount: execution.retryCount,
-      };
+      // Mark sessions as implemented
+      if (execution.sessionIds.length > 0) {
+        await prisma.patternSession.updateMany({
+          where: {
+            id: { in: execution.sessionIds },
+          },
+          data: {
+            status: "implemented",
+            implementedAt: new Date(),
+            implementedBy: execution.triggeredBy,
+          },
+        });
+      }
+    } else if (status === "failed" || error) {
+      messageData.type = "execution_failed";
+      messageData.title = "Implementation Failed";
+      messageData.content = error || "Execution failed";
+      messageData.data = { error };
+
+      // Mark sessions as active so they can be retried
+      // (Keep them in submitted_for_review status so they can be picked up again)
+      if (execution.sessionIds.length > 0) {
+        // Don't change status - let them remain submitted_for_review for retry
+      }
+    } else if (progress !== undefined && progress > 0) {
+      messageData.type = "execution_progress";
+      messageData.title = `Progress: ${progress}%`;
+      messageData.content = data?.message || `Execution ${progress}% complete`;
+      messageData.data = { phase, progress };
+      messageData.progress = progress;
     }
 
-    // Create workspace message if needed
-    if (messageType && execution.workspace) {
+    if (messageData.type) {
       await prisma.workspaceMessage.create({
-        data: {
-          workspaceId: execution.workspaceId,
-          type: messageType,
-          content: messageContent,
-          authorType: "claude",
-          executionId: executionId,
-          data: messageData,
-          status: statusData.status,
-          progress: statusData.progress,
-        },
+        data: messageData,
       });
-
-      console.log(`[TIMELINE] Created message: ${messageType}`);
     }
 
-    await updateHeartbeat();
+    // Archive processed file
+    const archiveDir = path.join(STATUS_DIR, "processed");
+    if (!fs.existsSync(archiveDir)) {
+      fs.mkdirSync(archiveDir, { recursive: true });
+    }
+
+    const archivePath = path.join(archiveDir, `${Date.now()}-${filename}`);
+    fs.renameSync(filePath, archivePath);
+
+    console.log(`[PROCESSED] Status update archived: ${archivePath}`);
   } catch (error) {
-    console.error(`[ERROR] Failed to process status update:`, error);
+    console.error(`[ERROR] Failed to process status file ${filename}:`, error);
+
+    // Move to error directory
+    const errorDir = path.join(STATUS_DIR, "errors");
+    if (!fs.existsSync(errorDir)) {
+      fs.mkdirSync(errorDir, { recursive: true });
+    }
+
+    const errorPath = path.join(errorDir, `${Date.now()}-${filename}`);
+    try {
+      fs.renameSync(filePath, errorPath);
+    } catch (e) {
+      console.error(`[ERROR] Failed to move error file:`, e);
+    }
   }
 }
 
-// Main watcher
-async function main() {
-  console.log("[WORKSPACE STATUS WATCHER STARTED]");
-  console.log(`Watching directory: ${STATUS_DIR}`);
-  console.log(`Heartbeat file: ${HEARTBEAT_FILE}`);
-  console.log(`Max runtime: ${MAX_RUNTIME}ms\n`);
+// Poll status directory for new files
+async function pollStatusDirectory() {
+  try {
+    if (!fs.existsSync(STATUS_DIR)) {
+      return;
+    }
 
-  // Verify directory exists
-  if (!existsSync(STATUS_DIR)) {
-    console.error(`[ERROR] Status directory does not exist: ${STATUS_DIR}`);
-    console.error("Run setup script: ./scripts/setup-claude-workspace.sh");
-    process.exit(1);
+    const files = fs.readdirSync(STATUS_DIR).filter(f => f.endsWith(".json"));
+
+    if (files.length === 0) {
+      return;
+    }
+
+    console.log(`[FOUND] ${files.length} status update(s) to process`);
+
+    for (const file of files) {
+      await processStatusUpdate(file);
+    }
+  } catch (error) {
+    console.error(`[ERROR] Polling error:`, error);
+  }
+}
+
+// Main loop
+async function main() {
+  console.log("[STATUS WATCHER STARTED]");
+  console.log(`Status directory: ${STATUS_DIR}`);
+  console.log(`Poll interval: ${POLL_INTERVAL}ms`);
+  console.log("Watching for Claude Code status updates...\n");
+
+  // Ensure directory exists
+  ensureStatusDirectory();
+
+  // Set up polling interval
+  const pollInterval = setInterval(async () => {
+    await pollStatusDirectory();
+  }, POLL_INTERVAL);
+
+  // Initial poll
+  await pollStatusDirectory();
+
+  // Also set up file system watcher for immediate updates
+  try {
+    const watcher = watch(STATUS_DIR, async (eventType, filename) => {
+      if (filename && filename.endsWith(".json") && eventType === "rename") {
+        // Wait a bit to ensure file is fully written
+        setTimeout(async () => {
+          const filePath = path.join(STATUS_DIR, filename);
+          if (fs.existsSync(filePath)) {
+            await processStatusUpdate(filename);
+          }
+        }, 100);
+      }
+    });
+
+    console.log("[FS WATCH] File system watcher active for immediate updates");
+  } catch (error) {
+    console.warn("[WARN] Could not set up file system watcher, using polling only:", error);
   }
 
-  // Initial heartbeat
-  await updateHeartbeat();
-
-  // Set up freeze detection
-  const freezeCheckInterval = setInterval(checkForFreeze, 10000);
-
-  // Watch for status file changes
-  const watcher = watch(
-    STATUS_DIR,
-    { persistent: true },
-    async (eventType, filename) => {
-      if (!filename) return;
-
-      // Only process JSON files
-      if (!filename.endsWith(".json")) {
-        return;
-      }
-
-      console.log(`[FILE EVENT] ${eventType}: ${filename}`);
-      await updateHeartbeat();
-
-      // Process status update
-      if (eventType === "change" || eventType === "rename") {
-        // Small delay to ensure file is fully written
-        setTimeout(() => {
-          processStatusUpdate(filename);
-        }, 500);
-      }
-    }
-  );
-
-  console.log("[WATCHING] Waiting for status updates...\n");
-
-  // Periodic heartbeat
-  const heartbeatInterval = setInterval(async () => {
-    await updateHeartbeat();
-  }, 5000);
-
-  // Graceful shutdown
+  // Keep process alive
   process.on("SIGTERM", async () => {
     console.log("\n[SIGTERM] Shutting down gracefully...");
-    clearInterval(freezeCheckInterval);
-    clearInterval(heartbeatInterval);
-    watcher.close();
+    clearInterval(pollInterval);
     await prisma.$disconnect();
     process.exit(0);
   });
 
   process.on("SIGINT", async () => {
     console.log("\n[SIGINT] Shutting down gracefully...");
-    clearInterval(freezeCheckInterval);
-    clearInterval(heartbeatInterval);
-    watcher.close();
+    clearInterval(pollInterval);
     await prisma.$disconnect();
     process.exit(0);
-  });
-
-  // Handle watcher errors
-  watcher.on("error", (error) => {
-    console.error("[WATCHER ERROR]", error);
   });
 }
 

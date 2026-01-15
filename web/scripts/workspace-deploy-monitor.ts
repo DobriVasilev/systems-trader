@@ -3,409 +3,355 @@
 /**
  * Workspace Deploy Monitor
  *
- * Polls Vercel API for deployment status after Claude commits changes
- * Tracks deployment progress and handles failures with retry logic
+ * Monitors Vercel deployments for workspace implementations
+ * Implements auto-retry with log forwarding on failure
  *
  * Run with: npm run monitor:workspace-deploy
  */
 
 import { PrismaClient } from "@prisma/client";
-import { writeFile } from "fs/promises";
+import * as fs from "fs";
+import * as path from "path";
 
 const prisma = new PrismaClient();
 
 // Configuration
-const POLL_INTERVAL = 10000; // 10 seconds
-const HEARTBEAT_FILE = "/tmp/workspace-deploy-monitor-heartbeat.txt";
-const MAX_RUNTIME = 30 * 60 * 1000; // 30 minutes
-const MAX_RETRIES = 10;
-
-// Vercel API configuration
+const POLL_INTERVAL = 30000; // Check every 30 seconds
+const VERCEL_API_URL = "https://api.vercel.com";
 const VERCEL_TOKEN = process.env.VERCEL_TOKEN;
 const VERCEL_PROJECT_ID = process.env.VERCEL_PROJECT_ID;
-const VERCEL_TEAM_ID = process.env.VERCEL_TEAM_ID;
+const WORKSPACE_DIR = "/tmp/claude-workspace";
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "admin@example.com";
 
-if (!VERCEL_TOKEN || !VERCEL_PROJECT_ID) {
-  console.error("[ERROR] Missing Vercel configuration:");
-  console.error("- VERCEL_TOKEN:", VERCEL_TOKEN ? "✓" : "✗");
-  console.error("- VERCEL_PROJECT_ID:", VERCEL_PROJECT_ID ? "✓" : "✗");
+if (!VERCEL_TOKEN) {
+  console.error("[ERROR] VERCEL_TOKEN environment variable not set");
   process.exit(1);
 }
 
-// Track health
-let lastHeartbeat = Date.now();
-let startTime = Date.now();
-
-// Write heartbeat
-async function updateHeartbeat() {
-  try {
-    await writeFile(HEARTBEAT_FILE, Date.now().toString());
-    lastHeartbeat = Date.now();
-  } catch (error) {
-    console.error("[ERROR] Failed to write heartbeat:", error);
-  }
+if (!VERCEL_PROJECT_ID) {
+  console.error("[ERROR] VERCEL_PROJECT_ID environment variable not set");
+  process.exit(1);
 }
 
-// Freeze detection
-function checkForFreeze() {
-  const now = Date.now();
-  if (now - lastHeartbeat > 60000) {
-    console.error(`[FREEZE DETECTED] No heartbeat for ${now - lastHeartbeat}ms`);
-    process.exit(1);
-  }
-  if (now - startTime > MAX_RUNTIME) {
-    console.log(`[MAX RUNTIME] Monitor has run for ${MAX_RUNTIME}ms. Exiting.`);
-    process.exit(0);
-  }
-}
-
-// Fetch deployments from Vercel
-async function fetchVercelDeployments(): Promise<any[]> {
+// Fetch deployment by commit hash
+async function fetchDeploymentByCommit(commitHash: string) {
   try {
-    const url = new URL(
-      `https://api.vercel.com/v6/deployments`
+    const response = await fetch(
+      `${VERCEL_API_URL}/v6/deployments?projectId=${VERCEL_PROJECT_ID}&gitCommitSha=${commitHash}`,
+      {
+        headers: {
+          Authorization: `Bearer ${VERCEL_TOKEN}`,
+        },
+      }
     );
-    url.searchParams.set("projectId", VERCEL_PROJECT_ID!);
-    if (VERCEL_TEAM_ID) {
-      url.searchParams.set("teamId", VERCEL_TEAM_ID);
-    }
-    url.searchParams.set("limit", "20");
-
-    const response = await fetch(url.toString(), {
-      headers: {
-        Authorization: `Bearer ${VERCEL_TOKEN}`,
-      },
-    });
 
     if (!response.ok) {
-      throw new Error(
-        `Vercel API error: ${response.status} ${response.statusText}`
-      );
+      throw new Error(`Vercel API error: ${response.status} ${response.statusText}`);
     }
 
     const data = await response.json();
-    return data.deployments || [];
+    return data.deployments?.[0] || null;
   } catch (error) {
-    console.error("[ERROR] Failed to fetch deployments:", error);
-    return [];
+    console.error(`[ERROR] Failed to fetch deployment:`, error);
+    return null;
   }
 }
 
-// Fetch deployment logs from Vercel
-async function fetchDeploymentLogs(deploymentId: string): Promise<string> {
+// Fetch deployment logs
+async function fetchDeploymentLogs(deploymentId: string): Promise<string | null> {
   try {
-    const url = new URL(
-      `https://api.vercel.com/v2/deployments/${deploymentId}/events`
+    const response = await fetch(
+      `${VERCEL_API_URL}/v2/deployments/${deploymentId}/events`,
+      {
+        headers: {
+          Authorization: `Bearer ${VERCEL_TOKEN}`,
+        },
+      }
     );
-    if (VERCEL_TEAM_ID) {
-      url.searchParams.set("teamId", VERCEL_TEAM_ID);
-    }
-
-    const response = await fetch(url.toString(), {
-      headers: {
-        Authorization: `Bearer ${VERCEL_TOKEN}`,
-      },
-    });
 
     if (!response.ok) {
-      return `Failed to fetch logs: ${response.status} ${response.statusText}`;
+      throw new Error(`Vercel API error: ${response.status} ${response.statusText}`);
     }
 
-    const logs = await response.text();
+    const events = await response.json();
 
-    // Parse and extract error messages
-    const lines = logs.split("\n").filter(Boolean);
-    const errorLines = lines.filter(
-      (line) =>
-        line.includes("Error") ||
-        line.includes("error") ||
-        line.includes("Failed") ||
-        line.includes("failed")
-    );
+    // Extract error logs
+    const errorLogs = events
+      .filter((e: any) => e.type === "stderr" || e.payload?.level === "error")
+      .map((e: any) => e.payload?.text || e.text)
+      .join("\n");
 
-    return errorLines.length > 0
-      ? errorLines.slice(-50).join("\n") // Last 50 error lines
-      : lines.slice(-100).join("\n"); // Last 100 lines if no errors
+    return errorLogs || null;
   } catch (error) {
-    return `Failed to fetch logs: ${error instanceof Error ? error.message : String(error)}`;
+    console.error(`[ERROR] Failed to fetch logs:`, error);
+    return null;
   }
 }
 
-// Process deployment status
-async function processDeployment(deployment: any) {
+// Send retry feedback to Claude
+async function sendRetryFeedback(execution: any, deployLogs: string) {
+  const workspace = execution.workspace;
+  const retryCount = execution.retryCount + 1;
+
+  console.log(`[RETRY] Creating retry feedback for execution ${execution.id} (attempt ${retryCount}/${execution.maxRetries})`);
+
+  // Create retry execution
+  const retryExecution = await prisma.claudeExecution.create({
+    data: {
+      workspaceId: workspace.id,
+      triggeredBy: execution.triggeredBy,
+      status: "pending",
+      phase: "planning",
+      progress: 0,
+      sessionIds: execution.sessionIds,
+      feedbackType: "deploy_failure_retry",
+      retryCount: retryCount,
+      maxRetries: execution.maxRetries,
+      parentExecutionId: execution.id,
+      retryReason: `Deployment failed with errors:\n${deployLogs}`,
+    },
+  });
+
+  // Create workspace message
+  await prisma.workspaceMessage.create({
+    data: {
+      workspaceId: workspace.id,
+      executionId: retryExecution.id,
+      type: "execution_retry",
+      authorType: "system",
+      title: `Deploy Failed - Auto Retry ${retryCount}/${execution.maxRetries}`,
+      content: `Deployment failed. Claude will automatically retry with deployment logs.`,
+      data: {
+        originalExecutionId: execution.id,
+        retryCount: retryCount,
+        maxRetries: execution.maxRetries,
+      },
+    },
+  });
+
+  // Generate retry prompt
+  let prompt = `# 🔄 Deploy Failure - Auto Retry\n\n`;
+  prompt += `**Pattern:** ${workspace.name} (${workspace.patternType})\n`;
+  prompt += `**Version:** ${workspace.version}\n`;
+  prompt += `**Retry Attempt:** ${retryCount}/${execution.maxRetries}\n\n`;
+
+  prompt += `## 🚨 Deployment Error\n\n`;
+  prompt += `The previous implementation was committed successfully, but the deployment failed with the following errors:\n\n`;
+  prompt += `\`\`\`\n${deployLogs}\n\`\`\`\n\n`;
+
+  prompt += `## 🎯 Task\n\n`;
+  prompt += `Please analyze the deployment errors and fix the issues. Common problems include:\n`;
+  prompt += `- TypeScript compilation errors\n`;
+  prompt += `- Missing dependencies\n`;
+  prompt += `- Import/export issues\n`;
+  prompt += `- Build configuration problems\n\n`;
+
+  prompt += `After fixing:\n`;
+  prompt += `1. Ensure all TypeScript errors are resolved\n`;
+  prompt += `2. Run the build locally to verify\n`;
+  prompt += `3. Commit the fixes\n`;
+  prompt += `4. The system will monitor the deployment again\n\n`;
+
+  // Write prompt to file
+  const promptFile = path.join(WORKSPACE_DIR, "prompts", `${retryExecution.id}-retry.md`);
+  fs.writeFileSync(promptFile, prompt);
+
+  // Create feedback queue file
+  const feedbackFile = path.join(WORKSPACE_DIR, "feedback-queue", `${retryExecution.id}-retry.json`);
+  const feedbackData = {
+    executionId: retryExecution.id,
+    workspaceId: workspace.id,
+    patternType: workspace.patternType,
+    patternName: workspace.name,
+    retryAttempt: retryCount,
+    maxRetries: execution.maxRetries,
+    parentExecutionId: execution.id,
+    promptFile: promptFile,
+    deployLogs: deployLogs,
+    timestamp: new Date().toISOString(),
+  };
+
+  fs.writeFileSync(feedbackFile, JSON.stringify(feedbackData, null, 2));
+
+  // Update retry execution with prompt file
+  await prisma.claudeExecution.update({
+    where: { id: retryExecution.id },
+    data: {
+      promptFile: promptFile,
+    },
+  });
+
+  console.log(`[RETRY QUEUED] Feedback file created: ${feedbackFile}`);
+}
+
+// Send admin notification email
+async function sendAdminNotification(execution: any, deployLogs: string) {
+  console.log(`[MAX RETRIES] Execution ${execution.id} has reached max retries, notifying admin`);
+
+  // Create failure message
+  await prisma.workspaceMessage.create({
+    data: {
+      workspaceId: execution.workspaceId,
+      executionId: execution.id,
+      type: "execution_failed",
+      authorType: "system",
+      title: "Max Retries Reached - Manual Intervention Required",
+      content: `Deployment has failed ${execution.maxRetries} times. Admin has been notified.`,
+      data: {
+        retryCount: execution.retryCount,
+        maxRetries: execution.maxRetries,
+        requiresManualIntervention: true,
+      },
+    },
+  });
+
+  // TODO: Integrate with SendGrid or other email service
+  console.log(`[EMAIL] Would send notification to: ${ADMIN_EMAIL}`);
+  console.log(`[EMAIL] Subject: Max Deploy Retries Reached - ${execution.workspace.name}`);
+  console.log(`[EMAIL] Execution ID: ${execution.id}`);
+}
+
+// Check pending executions for deploy monitoring
+async function monitorDeployments() {
   try {
-    const commitHash = deployment.meta?.githubCommitSha || deployment.meta?.gitSource?.sha;
+    console.log(`[${new Date().toISOString()}] Checking for deployments to monitor...`);
 
-    if (!commitHash) {
-      return; // Skip deployments without commit info
-    }
-
-    // Find execution by commit hash
-    const execution = await prisma.claudeExecution.findFirst({
+    // Find executions that completed successfully but haven't been deployed yet
+    const executions = await prisma.claudeExecution.findMany({
       where: {
-        commitHash: commitHash,
         status: "completed",
+        commitHash: { not: null },
+        deployStatus: { in: [null, "building"] },
       },
       include: {
         workspace: true,
       },
+      orderBy: {
+        completedAt: "asc",
+      },
     });
 
-    if (!execution) {
-      return; // Not a Claude execution
+    if (executions.length === 0) {
+      console.log("[NO DEPLOYMENTS] No pending deployments to monitor");
+      return;
     }
 
-    const deploymentStatus = deployment.state || deployment.status;
-    const deploymentUrl = deployment.url ? `https://${deployment.url}` : null;
+    console.log(`[MONITORING] Found ${executions.length} deployment(s) to check`);
 
-    console.log(
-      `[DEPLOYMENT] Execution: ${execution.id}, Status: ${deploymentStatus}`
-    );
+    for (const execution of executions) {
+      console.log(`[CHECKING] Execution ${execution.id} - Commit: ${execution.commitHash}`);
 
-    // Check if status changed
-    if (execution.deployStatus === deploymentStatus) {
-      return; // No change
-    }
+      const deployment = await fetchDeploymentByCommit(execution.commitHash!);
 
-    // Update execution
-    const updateData: any = {
-      deployStatus: deploymentStatus,
-    };
-
-    // Handle deployment start
-    if (
-      deploymentStatus === "QUEUED" ||
-      deploymentStatus === "BUILDING"
-    ) {
-      if (!execution.deployStartedAt) {
-        updateData.deployStartedAt = new Date();
-
-        // Create timeline message
-        await prisma.workspaceMessage.create({
-          data: {
-            workspaceId: execution.workspaceId,
-            type: "deploy_started",
-            content: "Deployment started",
-            authorType: "system",
-            executionId: execution.id,
-            status: "in_progress",
+      if (!deployment) {
+        // Deployment not found yet, might still be queued
+        if (!execution.deployStartedAt) {
+          await prisma.claudeExecution.update({
+            where: { id: execution.id },
             data: {
-              executionId: execution.id,
-              commitHash: commitHash,
-              deploymentId: deployment.id,
+              deployStartedAt: new Date(),
+              deployStatus: "building",
             },
-          },
-        });
+          });
+        }
+        console.log(`[QUEUED] Deployment not found yet for commit ${execution.commitHash}`);
+        continue;
       }
 
-      if (deploymentStatus === "BUILDING") {
+      const deployState = deployment.state; // ready, building, error, canceled
+      const deployUrl = deployment.url;
+
+      console.log(`[DEPLOY STATUS] ${deployState} - ${deployUrl}`);
+
+      if (deployState === "READY") {
+        // Deployment successful
+        await prisma.claudeExecution.update({
+          where: { id: execution.id },
+          data: {
+            deployStatus: "ready",
+            deployUrl: `https://${deployUrl}`,
+            deployCompletedAt: new Date(),
+          },
+        });
+
         await prisma.workspaceMessage.create({
           data: {
             workspaceId: execution.workspaceId,
-            type: "deploy_building",
-            content: "Deployment building...",
-            authorType: "system",
             executionId: execution.id,
-            status: "in_progress",
+            type: "deploy_succeeded",
+            authorType: "system",
+            title: "Deployment Successful",
+            content: `Changes deployed successfully to production`,
             data: {
-              executionId: execution.id,
-              deploymentId: deployment.id,
+              deployUrl: `https://${deployUrl}`,
+              commitHash: execution.commitHash,
             },
           },
         });
+
+        console.log(`[SUCCESS] Deployment successful: https://${deployUrl}`);
+      } else if (deployState === "ERROR" || deployState === "CANCELED") {
+        // Deployment failed
+        console.log(`[FAILED] Deployment failed with state: ${deployState}`);
+
+        const logs = await fetchDeploymentLogs(deployment.id);
+
+        await prisma.claudeExecution.update({
+          where: { id: execution.id },
+          data: {
+            deployStatus: "error",
+            deployLogs: logs || "Deployment failed (no logs available)",
+            deployCompletedAt: new Date(),
+          },
+        });
+
+        // Check retry count
+        if (execution.retryCount < execution.maxRetries) {
+          // Auto-retry with logs
+          await sendRetryFeedback(execution, logs || "Deployment failed");
+        } else {
+          // Max retries reached, notify admin
+          await sendAdminNotification(execution, logs || "Deployment failed");
+        }
+      } else if (deployState === "BUILDING" || deployState === "QUEUED") {
+        // Still building
+        if (!execution.deployStartedAt) {
+          await prisma.claudeExecution.update({
+            where: { id: execution.id },
+            data: {
+              deployStartedAt: new Date(),
+              deployStatus: "building",
+            },
+          });
+        }
+        console.log(`[BUILDING] Deployment in progress...`);
       }
-    }
-
-    // Handle deployment success
-    if (deploymentStatus === "READY") {
-      updateData.deployCompletedAt = new Date();
-      updateData.deployUrl = deploymentUrl;
-
-      await prisma.workspaceMessage.create({
-        data: {
-          workspaceId: execution.workspaceId,
-          type: "deploy_success",
-          content: "Deployment successful",
-          authorType: "system",
-          executionId: execution.id,
-          status: "completed",
-          data: {
-            executionId: execution.id,
-            deploymentId: deployment.id,
-            deployUrl: deploymentUrl,
-            version: execution.workspace.version,
-            duration: execution.deployStartedAt
-              ? Math.floor(
-                  (new Date().getTime() - execution.deployStartedAt.getTime()) /
-                    1000
-                )
-              : 0,
-          },
-        },
-      });
-
-      // Update workspace version on successful deploy
-      const versionParts = execution.workspace.version.split(".");
-      const newPatch = parseInt(versionParts[2] || "0") + 1;
-      const newVersion = `${versionParts[0]}.${versionParts[1]}.${newPatch}`;
-
-      await prisma.patternWorkspace.update({
-        where: { id: execution.workspaceId },
-        data: {
-          version: newVersion,
-          lastTestedAt: new Date(),
-        },
-      });
-
-      console.log(`[SUCCESS] Deployment completed for execution ${execution.id}`);
-    }
-
-    // Handle deployment failure
-    if (deploymentStatus === "ERROR" || deploymentStatus === "CANCELED") {
-      // Fetch logs
-      const logs = await fetchDeploymentLogs(deployment.id);
-      updateData.deployLogs = logs;
-
-      // Check retry count
-      const willRetry = execution.retryCount < MAX_RETRIES;
-
-      if (willRetry) {
-        // Increment retry count
-        updateData.retryCount = execution.retryCount + 1;
-        updateData.retryReason = `Deploy failed: ${deploymentStatus}`;
-
-        // Create retry message
-        await prisma.workspaceMessage.create({
-          data: {
-            workspaceId: execution.workspaceId,
-            type: "deploy_retry",
-            content: `Deployment failed, retrying (${execution.retryCount + 1}/${MAX_RETRIES})`,
-            authorType: "system",
-            executionId: execution.id,
-            status: "in_progress",
-            data: {
-              executionId: execution.id,
-              retryNumber: execution.retryCount + 1,
-              maxRetries: MAX_RETRIES,
-              previousError: `Deploy ${deploymentStatus}`,
-            },
-          },
-        });
-
-        // Create new feedback file with error context
-        // This will trigger Claude to fix the deploy error
-        const errorContext = `
-# Deployment Error - Retry ${execution.retryCount + 1}/${MAX_RETRIES}
-
-The previous deployment failed with status: ${deploymentStatus}
-
-## Error Logs
-\`\`\`
-${logs}
-\`\`\`
-
-## Your Task
-1. Analyze the deployment error logs above
-2. Identify the root cause
-3. Fix the issue
-4. Commit the fix
-5. The deployment will be automatically triggered
-
-Focus on fixing the build/deployment error, not the original pattern implementation.
-`;
-
-        console.log(`[RETRY] Triggering retry ${execution.retryCount + 1}/${MAX_RETRIES}`);
-
-        // In a real implementation, you would trigger Claude here
-        // For now, just log it
-        console.log("[TODO] Trigger Claude with error context");
-      } else {
-        // Max retries reached
-        updateData.status = "failed";
-        updateData.error = `Deployment failed after ${MAX_RETRIES} retries`;
-
-        await prisma.workspaceMessage.create({
-          data: {
-            workspaceId: execution.workspaceId,
-            type: "deploy_failed",
-            content: `Deployment failed after ${MAX_RETRIES} retries`,
-            authorType: "system",
-            executionId: execution.id,
-            status: "failed",
-            data: {
-              executionId: execution.id,
-              deploymentId: deployment.id,
-              error: `Deploy ${deploymentStatus}`,
-              logs: logs.substring(0, 5000), // Limit log size
-              retryCount: execution.retryCount,
-              willRetry: false,
-            },
-          },
-        });
-
-        console.log(`[FAILED] Max retries reached for execution ${execution.id}`);
-
-        // TODO: Send email to admin
-        console.log("[TODO] Send email notification to admin");
-      }
-    }
-
-    await prisma.claudeExecution.update({
-      where: { id: execution.id },
-      data: updateData,
-    });
-
-    await updateHeartbeat();
-  } catch (error) {
-    console.error("[ERROR] Failed to process deployment:", error);
-  }
-}
-
-// Main polling loop
-async function pollDeployments() {
-  try {
-    await updateHeartbeat();
-
-    console.log(`[${new Date().toISOString()}] Polling Vercel deployments...`);
-
-    const deployments = await fetchVercelDeployments();
-    console.log(`[DEPLOYMENTS] Found ${deployments.length} recent deployments`);
-
-    for (const deployment of deployments) {
-      await processDeployment(deployment);
     }
   } catch (error) {
-    console.error("[ERROR] Polling error:", error);
+    console.error(`[ERROR] Monitoring error:`, error);
   }
 }
 
 // Main loop
 async function main() {
-  console.log("[WORKSPACE DEPLOY MONITOR STARTED]");
+  console.log("[DEPLOY MONITOR STARTED]");
+  console.log(`Vercel Project ID: ${VERCEL_PROJECT_ID}`);
   console.log(`Poll interval: ${POLL_INTERVAL}ms`);
-  console.log(`Max runtime: ${MAX_RUNTIME}ms`);
-  console.log(`Heartbeat file: ${HEARTBEAT_FILE}`);
-  console.log(`Max retries: ${MAX_RETRIES}\n`);
+  console.log(`Workspace directory: ${WORKSPACE_DIR}`);
+  console.log("Monitoring Vercel deployments...\n");
 
-  // Initial heartbeat
-  await updateHeartbeat();
-
-  // Set up freeze detection
-  const freezeCheckInterval = setInterval(checkForFreeze, 10000);
-
-  // Set up polling
+  // Set up polling interval
   const pollInterval = setInterval(async () => {
-    await pollDeployments();
+    await monitorDeployments();
   }, POLL_INTERVAL);
 
-  // Initial poll
-  await pollDeployments();
+  // Initial check
+  await monitorDeployments();
 
-  // Graceful shutdown
+  // Keep process alive
   process.on("SIGTERM", async () => {
     console.log("\n[SIGTERM] Shutting down gracefully...");
     clearInterval(pollInterval);
-    clearInterval(freezeCheckInterval);
     await prisma.$disconnect();
     process.exit(0);
   });
@@ -413,7 +359,6 @@ async function main() {
   process.on("SIGINT", async () => {
     console.log("\n[SIGINT] Shutting down gracefully...");
     clearInterval(pollInterval);
-    clearInterval(freezeCheckInterval);
     await prisma.$disconnect();
     process.exit(0);
   });
