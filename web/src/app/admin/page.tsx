@@ -12,9 +12,11 @@ export default async function AdminPage() {
   }
 
   return (
-    <div className="min-h-screen bg-black">
+    <div className="min-h-screen bg-black grid-background">
       <AppHeader title="Admin Panel" />
-      <AdminDashboard />
+      <div className="relative z-10">
+        <AdminDashboard />
+      </div>
     </div>
   );
 }

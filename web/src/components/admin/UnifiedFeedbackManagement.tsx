@@ -215,7 +215,100 @@ Please review this indicator reasoning and implement the pattern detection logic
 **Submitted:** ${new Date(reasoning.createdAt).toLocaleString()}`;
   }
 
-  async function copyClaudePrompt(id: string, type: "correction" | "reasoning") {
+  function generateSessionMasterPrompt(group: SessionGroup): string {
+    const standardsHeader = `# 🎯 CRITICAL: READ CLAUDE STANDARDS FIRST
+
+Before proceeding, read and internalize the standards in CLAUDE_STANDARDS_TEMPLATE.md.
+This defines the quality bar for ALL implementations.
+
+---
+
+`;
+
+    let prompt = standardsHeader;
+    prompt += `# SESSION FEEDBACK: ${group.sessionName}\n\n`;
+    prompt += `## Session Overview\n\n`;
+    prompt += `- **Session:** ${group.sessionName}\n`;
+    prompt += `- **Symbol:** ${group.symbol}\n`;
+    prompt += `- **Timeframe:** ${group.timeframe}\n`;
+    prompt += `- **Total Corrections:** ${group.totalCorrections}\n`;
+    prompt += `- **Unique Users:** ${new Set(group.corrections.map(c => c.user.email)).size}\n\n`;
+
+    prompt += `## User Feedback Summary\n\n`;
+    prompt += `This session has ${group.totalCorrections} corrections from users identifying issues with pattern detection.\n`;
+    prompt += `Each correction represents a case where the algorithm failed to meet trading standards.\n\n`;
+
+    const correctionsByType: Record<string, number> = {};
+    group.corrections.forEach(c => {
+      correctionsByType[c.correctionType] = (correctionsByType[c.correctionType] || 0) + 1;
+    });
+
+    prompt += `**Breakdown by Type:**\n`;
+    Object.entries(correctionsByType).forEach(([type, count]) => {
+      const typeInfo = CORRECTION_TYPE_LABELS[type];
+      prompt += `- ${typeInfo?.label || type}: ${count}\n`;
+    });
+    prompt += `\n`;
+
+    prompt += `---\n\n`;
+    prompt += `## 📝 DETAILED CORRECTIONS\n\n`;
+    prompt += `**CRITICAL**: Analyze each correction systematically. These are real trading scenarios where the algorithm failed.\n\n`;
+
+    group.corrections.forEach((correction, index) => {
+      const typeInfo = CORRECTION_TYPE_LABELS[correction.correctionType] || { label: correction.correctionType };
+      prompt += `### Correction #${index + 1}: ${typeInfo.label.toUpperCase()}\n\n`;
+      prompt += `**User:** ${correction.user.name || "Unknown"} (${correction.user.email})\n`;
+      prompt += `**Date:** ${new Date(correction.createdAt).toLocaleString()}\n\n`;
+
+      if (correction.originalType) {
+        prompt += `- **Original Type:** ${correction.originalType}\n`;
+      }
+      if (correction.correctedType) {
+        prompt += `- **Corrected Type:** ${correction.correctedType}\n`;
+      }
+
+      prompt += `\n**Reasoning:**\n> ${correction.reason}\n\n`;
+      prompt += `---\n\n`;
+    });
+
+    prompt += `## 🧠 YOUR MISSION\n\n`;
+    prompt += `### Analysis Phase\n\n`;
+    prompt += `1. Load the full session data from the database (session ID: ${group.sessionId})\n`;
+    prompt += `2. Examine ALL corrections systematically\n`;
+    prompt += `3. Identify patterns in the feedback - what's the root cause?\n`;
+    prompt += `4. Understand what users expect vs what the algorithm delivers\n\n`;
+
+    prompt += `### Implementation Phase\n\n`;
+    prompt += `1. Design a solution that addresses ALL ${group.totalCorrections} corrections\n`;
+    prompt += `2. Update the pattern detection algorithm\n`;
+    prompt += `3. Handle edge cases identified by users\n`;
+    prompt += `4. Ensure changes don't break existing correct detections\n\n`;
+
+    prompt += `### Verification Phase\n\n`;
+    prompt += `1. Test against every correction in this session\n`;
+    prompt += `2. Run the algorithm on the session's chart data\n`;
+    prompt += `3. Verify all issues are resolved\n`;
+    prompt += `4. Check for regressions\n\n`;
+
+    prompt += `## 🔥 QUALITY STANDARDS\n\n`;
+    prompt += `- Follow ALL standards in CLAUDE_STANDARDS_TEMPLATE.md\n`;
+    prompt += `- Zero shortcuts - this is production trading code\n`;
+    prompt += `- Every correction must be addressed\n`;
+    prompt += `- Think deeply about root causes\n`;
+    prompt += `- Test thoroughly before committing\n\n`;
+
+    prompt += `## 📊 Data Available\n\n`;
+    prompt += `- **Session ID:** ${group.sessionId}\n`;
+    prompt += `- **Access via:** /api/sessions/${group.sessionId}\n`;
+    prompt += `- **Or use:** \`/sessions/${group.sessionId}\` page to review visually\n\n`;
+
+    prompt += `---\n\n`;
+    prompt += `**REMEMBER:** Real traders rely on this. Real money is at stake. Deliver excellence.\n`;
+
+    return prompt;
+  }
+
+  async function copyClaudePrompt(id: string, type: "correction" | "reasoning" | "session") {
     try {
       let prompt = "";
       if (type === "correction") {
@@ -225,10 +318,15 @@ Please review this indicator reasoning and implement the pattern detection logic
         if (correction) {
           prompt = generateClaudePrompt(correction);
         }
-      } else {
+      } else if (type === "reasoning") {
         const reasoning = indicatorReasoning.find(r => r.id === id);
         if (reasoning) {
           prompt = generateIndicatorPrompt(reasoning);
+        }
+      } else if (type === "session") {
+        const group = sessionGroups.find(g => g.sessionId === id);
+        if (group) {
+          prompt = generateSessionMasterPrompt(group);
         }
       }
 
@@ -480,13 +578,34 @@ Please review this indicator reasoning and implement the pattern detection logic
                             </div>
                           </div>
                         </div>
-                        <Link
-                          href={`/sessions/${group.sessionId}`}
-                          onClick={(e) => e.stopPropagation()}
-                          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm transition-colors"
-                        >
-                          View Session
-                        </Link>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              copyClaudePrompt(group.sessionId, "session");
+                            }}
+                            className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm transition-colors flex items-center gap-2"
+                          >
+                            {copiedId === group.sessionId ? (
+                              <>
+                                <CheckCircle className="w-4 h-4" />
+                                Copied!
+                              </>
+                            ) : (
+                              <>
+                                <Copy className="w-4 h-4" />
+                                Copy Master Prompt
+                              </>
+                            )}
+                          </button>
+                          <Link
+                            href={`/sessions/${group.sessionId}`}
+                            onClick={(e) => e.stopPropagation()}
+                            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm transition-colors"
+                          >
+                            View Session
+                          </Link>
+                        </div>
                       </button>
 
                       {/* Corrections List */}

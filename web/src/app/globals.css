@@ -300,3 +300,60 @@ body {
   background-size: 200px 200px;
   pointer-events: none;
 }
+
+/* ============================================================================
+   GRID BACKGROUND (Claude.ai style)
+   ============================================================================ */
+
+.grid-background {
+  position: relative;
+  background-color: var(--bg-0);
+}
+
+.grid-background::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  opacity: 0.15;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+  background-size: 40px 40px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.grid-background-light {
+  position: relative;
+  background-color: #fafaf9;
+}
+
+.grid-background-light::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  opacity: 0.4;
+  background-image:
+    linear-gradient(rgba(0, 0, 0, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 0, 0, 0.03) 1px, transparent 1px);
+  background-size: 40px 40px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Grid with dots pattern (alternative) */
+.grid-dots-background {
+  position: relative;
+  background-color: var(--bg-0);
+}
+
+.grid-dots-background::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  opacity: 0.2;
+  background-image: radial-gradient(circle, rgba(255, 255, 255, 0.15) 1px, transparent 1px);
+  background-size: 20px 20px;
+  pointer-events: none;
+  z-index: 0;
+}
