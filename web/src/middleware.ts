@@ -14,13 +14,14 @@ export function middleware(request: NextRequest) {
 
   const isAuthPage = pathname.startsWith("/auth");
   const isApiRoute = pathname.startsWith("/api");
+  const isWebhook = pathname.startsWith("/webhook");
   const isPublicRoute = pathname === "/" ||
     pathname === "/privacy" ||
     pathname === "/terms" ||
     pathname === "/logo-picker";
 
-  // Allow API routes (they handle their own auth)
-  if (isApiRoute) {
+  // Allow API routes and webhooks (they handle their own auth)
+  if (isApiRoute || isWebhook) {
     return NextResponse.next();
   }
 
