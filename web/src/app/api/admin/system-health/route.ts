@@ -1,30 +1,19 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import * as fs from "fs";
+import fs from "fs";
+import path from "path";
+
+const HEARTBEAT_FILE = "/tmp/feedback-watcher-heartbeat.json";
 
 /**
- * System Health Monitoring API
- * Returns health metrics for the autonomous feedback system
+ * GET /api/admin/system-health - Get system health metrics
  * Admin only
  */
-export async function GET(request: NextRequest) {
+export async function GET() {
   const session = await auth();
 
-  if (!session?.user?.id) {
-    return NextResponse.json(
-      { success: false, error: "Unauthorized" },
-      { status: 401 }
-    );
-  }
-
-  // Only admins can view system health
-  const user = await prisma.user.findUnique({
-    where: { id: session.user.id },
-    select: { role: true },
-  });
-
-  if (user?.role !== "admin") {
+  if (!session?.user?.id || session.user.role !== "admin") {
     return NextResponse.json(
       { success: false, error: "Admin access required" },
       { status: 403 }
@@ -32,200 +21,146 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    // Check watcher heartbeat
-    let watcherStatus = "unknown";
-    let lastHeartbeat: Date | null = null;
-    const heartbeatPath = "/tmp/feedback-watcher-heartbeat.txt";
+    // Read watcher heartbeat
+    let watcherStatus = {
+      status: "unknown",
+      lastHeartbeat: null as string | null,
+      timeSinceHeartbeat: null as number | null,
+    };
 
     try {
-      if (fs.existsSync(heartbeatPath)) {
-        const heartbeatTime = parseInt(fs.readFileSync(heartbeatPath, "utf8"));
-        lastHeartbeat = new Date(heartbeatTime);
-        const timeSinceHeartbeat = Date.now() - heartbeatTime;
+      if (fs.existsSync(HEARTBEAT_FILE)) {
+        const heartbeatData = JSON.parse(fs.readFileSync(HEARTBEAT_FILE, "utf-8"));
+        const lastHeartbeat = new Date(heartbeatData.timestamp);
+        const now = new Date();
+        const timeSinceMs = now.getTime() - lastHeartbeat.getTime();
+        const timeSinceMinutes = Math.floor(timeSinceMs / 1000 / 60);
 
-        if (timeSinceHeartbeat < 30000) {
-          // Less than 30s - healthy
-          watcherStatus = "healthy";
-        } else if (timeSinceHeartbeat < 60000) {
-          // 30-60s - warning
-          watcherStatus = "warning";
-        } else {
-          // More than 60s - unhealthy
-          watcherStatus = "unhealthy";
-        }
-      } else {
-        watcherStatus = "not_running";
+        watcherStatus = {
+          status:
+            timeSinceMinutes < 2
+              ? "healthy"
+              : timeSinceMinutes < 5
+              ? "warning"
+              : "error",
+          lastHeartbeat: lastHeartbeat.toISOString(),
+          timeSinceHeartbeat: timeSinceMinutes,
+        };
       }
     } catch (error) {
-      watcherStatus = "error";
+      console.error("Error reading heartbeat:", error);
     }
 
     // Get feedback statistics
+    const [total, pending, processing, analyzing, implementing, completed, failed] =
+      await Promise.all([
+        prisma.feedback.count(),
+        prisma.feedback.count({ where: { implementationStatus: "PENDING" } }),
+        prisma.feedback.count({ where: { implementationStatus: "PROCESSING" } }),
+        prisma.feedback.count({ where: { implementationStatus: "ANALYZING" } }),
+        prisma.feedback.count({ where: { implementationStatus: "IMPLEMENTING" } }),
+        prisma.feedback.count({ where: { implementationStatus: "COMPLETED" } }),
+        prisma.feedback.count({ where: { implementationStatus: "FAILED" } }),
+      ]);
+
+    const successRate =
+      total > 0 ? Math.round(((completed + failed) / total) * 100) : 0;
+
+    // Get activity metrics
     const now = new Date();
-    const last24h = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-    const last7d = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
 
-    const [
-      totalFeedback,
-      pendingFeedback,
-      processingFeedback,
-      completedFeedback,
-      failedFeedback,
-      feedbackLast24h,
-      feedbackLast7d,
-      avgProcessingTime,
-    ] = await Promise.all([
-      // Total feedback count
-      prisma.feedback.count(),
-
-      // Pending count
-      prisma.feedback.count({
-        where: { implementationStatus: "PENDING" },
-      }),
-
-      // Processing count (any in-progress status)
+    const [last24h, last7d] = await Promise.all([
       prisma.feedback.count({
         where: {
-          implementationStatus: {
-            in: ["PROCESSING", "ANALYZING", "IMPLEMENTING", "TESTING", "DEPLOYING"],
-          },
+          createdAt: { gte: yesterday },
         },
       }),
-
-      // Completed count
-      prisma.feedback.count({
-        where: { implementationStatus: "COMPLETED" },
-      }),
-
-      // Failed count
-      prisma.feedback.count({
-        where: { implementationStatus: "FAILED" },
-      }),
-
-      // Last 24h submissions
       prisma.feedback.count({
         where: {
-          createdAt: { gte: last24h },
-        },
-      }),
-
-      // Last 7d submissions
-      prisma.feedback.count({
-        where: {
-          createdAt: { gte: last7d },
-        },
-      }),
-
-      // Average processing time (completed in last 7 days)
-      prisma.feedback.aggregate({
-        where: {
-          implementationStatus: "COMPLETED",
-          processedAt: { not: null },
-          AND: [
-            { completedAt: { not: null } },
-            { completedAt: { gte: last7d } },
-          ],
-        },
-        _avg: {
-          // This won't work directly, need to calculate in application
+          createdAt: { gte: weekAgo },
         },
       }),
     ]);
 
-    // Calculate average processing time properly
-    const completedRecent = await prisma.feedback.findMany({
+    // Calculate average processing time
+    const completedFeedback = await prisma.feedback.findMany({
       where: {
         implementationStatus: "COMPLETED",
         processedAt: { not: null },
-        AND: [
-          { completedAt: { not: null } },
-          { completedAt: { gte: last7d } },
-        ],
       },
       select: {
+        createdAt: true,
         processedAt: true,
-        completedAt: true,
       },
+      take: 50,
     });
 
-    const avgProcessingTimeMs =
-      completedRecent.length > 0
-        ? completedRecent.reduce((sum, f) => {
-            const duration = f.completedAt!.getTime() - f.processedAt!.getTime();
-            return sum + duration;
-          }, 0) / completedRecent.length
-        : 0;
-
-    const avgProcessingTimeMinutes = Math.round(avgProcessingTimeMs / 1000 / 60);
+    let avgProcessingTimeMinutes = 0;
+    if (completedFeedback.length > 0) {
+      const totalTime = completedFeedback.reduce((sum, fb) => {
+        const diff = fb.processedAt!.getTime() - fb.createdAt.getTime();
+        return sum + diff;
+      }, 0);
+      avgProcessingTimeMinutes = Math.round(
+        totalTime / completedFeedback.length / 1000 / 60
+      );
+    }
 
     // Get recent failures
     const recentFailures = await prisma.feedback.findMany({
       where: {
         implementationStatus: "FAILED",
-        processedAt: { gte: last24h },
       },
       select: {
         id: true,
         title: true,
-        textContent: true,
         errorMessage: true,
-        processedAt: true,
         retryCount: true,
+        createdAt: true,
       },
       orderBy: {
-        processedAt: "desc",
+        updatedAt: "desc",
       },
-      take: 10,
+      take: 5,
     });
 
-    // Get dev_team user count
+    // Count dev team members
     const devTeamCount = await prisma.user.count({
-      where: { role: "dev_team" },
+      where: {
+        role: "dev_team",
+      },
     });
-
-    // Build health report
-    const health = {
-      timestamp: new Date().toISOString(),
-      watcher: {
-        status: watcherStatus,
-        lastHeartbeat: lastHeartbeat?.toISOString() || null,
-        timeSinceHeartbeat: lastHeartbeat
-          ? Math.round((Date.now() - lastHeartbeat.getTime()) / 1000)
-          : null,
-      },
-      feedback: {
-        total: totalFeedback,
-        pending: pendingFeedback,
-        processing: processingFeedback,
-        completed: completedFeedback,
-        failed: failedFeedback,
-        successRate:
-          completedFeedback + failedFeedback > 0
-            ? Math.round(
-                (completedFeedback / (completedFeedback + failedFeedback)) * 100
-              )
-            : 0,
-      },
-      activity: {
-        last24h: feedbackLast24h,
-        last7d: feedbackLast7d,
-        avgProcessingTimeMinutes,
-      },
-      users: {
-        devTeam: devTeamCount,
-      },
-      recentFailures: recentFailures.map((f) => ({
-        id: f.id,
-        title: f.title || f.textContent?.substring(0, 100),
-        error: f.errorMessage,
-        retryCount: f.retryCount,
-        failedAt: f.processedAt?.toISOString(),
-      })),
-    };
 
     return NextResponse.json({
       success: true,
-      data: health,
+      data: {
+        watcher: watcherStatus,
+        feedback: {
+          total,
+          pending,
+          processing: processing + analyzing + implementing,
+          completed,
+          failed,
+          successRate,
+        },
+        activity: {
+          last24h,
+          last7d,
+          avgProcessingTimeMinutes,
+        },
+        users: {
+          devTeam: devTeamCount,
+        },
+        recentFailures: recentFailures.map((fb) => ({
+          id: fb.id,
+          title: fb.title || "Untitled",
+          errorMessage: fb.errorMessage,
+          retryCount: fb.retryCount,
+          createdAt: fb.createdAt.toISOString(),
+        })),
+      },
     });
   } catch (error) {
     console.error("Error fetching system health:", error);
