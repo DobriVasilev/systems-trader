@@ -1,6 +1,18 @@
 module.exports = {
   apps: [
     {
+      name: 'webhook-server',
+      script: './scripts/webhook-server.js',
+      cwd: '/home/dobri/systems-trader/web',
+      interpreter: 'node',
+      env: {
+        NODE_ENV: 'production',
+        WEBHOOK_PORT: '3001',
+        PROJECT_DIR: '/home/dobri/systems-trader/web',
+        GITHUB_WEBHOOK_SECRET: process.env.GITHUB_WEBHOOK_SECRET || '',
+      },
+    },
+    {
       name: 'workspace-feedback',
       script: 'npm',
       args: 'run watch:workspace-feedback',
