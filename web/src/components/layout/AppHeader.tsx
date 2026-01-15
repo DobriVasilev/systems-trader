@@ -17,6 +17,7 @@ export function AppHeader({ title, showNav = true }: AppHeaderProps) {
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const isAdmin = session?.user?.role === "admin";
+  const isDevTeam = session?.user?.role === "dev_team";
 
   const navItems = [
     { href: "/dashboard", label: "Dashboard" },
@@ -24,6 +25,7 @@ export function AppHeader({ title, showNav = true }: AppHeaderProps) {
     { href: "/bots", label: "Bots" },
     { href: "/sessions", label: "Sessions" },
     { href: "/chat", label: "Chat" },
+    ...(isAdmin || isDevTeam ? [{ href: "/implementations", label: "Implementations" }] : []),
     ...(isAdmin ? [{ href: "/admin", label: "Admin" }] : []),
   ];
 
@@ -116,6 +118,9 @@ export function AppHeader({ title, showNav = true }: AppHeaderProps) {
                   {isAdmin && (
                     <div className="text-xs text-blue-400 font-medium">Admin</div>
                   )}
+                  {isDevTeam && (
+                    <div className="text-xs text-purple-400 font-medium">Dev Team</div>
+                  )}
                 </div>
                 <svg
                   className={`w-4 h-4 text-gray-500 transition-transform ${
@@ -148,6 +153,11 @@ export function AppHeader({ title, showNav = true }: AppHeaderProps) {
                     {isAdmin && (
                       <div className="mt-1 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-600 text-white">
                         Admin
+                      </div>
+                    )}
+                    {isDevTeam && (
+                      <div className="mt-1 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-600 text-white">
+                        Dev Team
                       </div>
                     )}
                   </div>

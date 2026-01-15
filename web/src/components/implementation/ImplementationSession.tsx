@@ -77,6 +77,7 @@ export function ImplementationSession({
   const [logs, setLogs] = useState<Array<{ timestamp: string; message: string; level: string }>>([]);
   const [showLogs, setShowLogs] = useState(false);
   const [copiedCheckpoint, setCopiedCheckpoint] = useState<string | null>(null);
+  const [error, setError] = useState<string>("");
 
   // Fetch implementation progress
   useEffect(() => {
@@ -125,13 +126,13 @@ export function ImplementationSession({
   }
 
   return (
-    <div className="min-h-screen bg-black grid-background">
-      {/* Header */}
-      <div className="sticky top-0 z-20 backdrop-blur-lg bg-black/80 border-b border-white/10">
-        <div className="max-w-6xl mx-auto px-6 py-4">
+    <div className="min-h-screen bg-black">
+      <div className="max-w-6xl mx-auto px-6 py-6">
+        {/* Session Info Header */}
+        <div className="mb-6">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-bold text-white">{title}</h1>
+              <h2 className="text-2xl font-bold text-white">{title}</h2>
               {description && (
                 <p className="text-sm text-gray-400 mt-1">{description}</p>
               )}
@@ -161,9 +162,6 @@ export function ImplementationSession({
             </motion.div>
           )}
         </div>
-      </div>
-
-      <div className="max-w-6xl mx-auto px-6 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Main Content - Phases */}
           <div className="lg:col-span-2 space-y-4">

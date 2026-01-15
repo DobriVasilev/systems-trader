@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { ImplementationSession } from "@/components/implementation/ImplementationSession";
+import { AppHeader } from "@/components/layout/AppHeader";
 
 export default async function ImplementationPage({
   params,
@@ -11,6 +12,11 @@ export default async function ImplementationPage({
   const session = await auth();
   if (!session?.user) {
     redirect("/auth/login");
+  }
+
+  // Allow admin and dev_team users
+  if (session.user.role !== "admin" && session.user.role !== "dev_team") {
+    redirect("/dashboard");
   }
 
   const { id } = await params;
@@ -28,15 +34,18 @@ export default async function ImplementationPage({
   });
 
   if (!implementation) {
-    redirect("/admin");
+    redirect("/dashboard");
   }
 
   return (
-    <ImplementationSession
-      sessionId={implementation.id}
-      title={implementation.title}
-      description={implementation.description || undefined}
-      type={implementation.type}
-    />
+    <div className="min-h-screen bg-black">
+      <AppHeader title="Implementation Progress" showBackButton />
+      <ImplementationSession
+        sessionId={implementation.id}
+        title={implementation.title}
+        description={implementation.description || undefined}
+        type={implementation.type}
+      />
+    </div>
   );
 }
