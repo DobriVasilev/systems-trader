@@ -17,7 +17,9 @@ import {
   User,
   Calendar,
   Activity,
+  MessageSquare,
 } from "lucide-react";
+import { ClaudeChatInterface } from "./ClaudeChatInterface";
 
 interface ExecutionData {
   execution: {
@@ -532,6 +534,30 @@ export function ExecutionViewer({ executionId }: { executionId: string }) {
             </div>
           </div>
         )}
+
+        {/* Interactive Chat */}
+        <div className="bg-gray-900 border border-gray-800 rounded-lg">
+          <div className="px-6 py-4 border-b border-gray-800">
+            <div className="flex items-center gap-3">
+              <MessageSquare className="w-5 h-5 text-blue-400" />
+              <div>
+                <h3 className="font-semibold text-white">Ask Claude</h3>
+                <p className="text-sm text-gray-400">
+                  Send follow-up questions or request changes
+                </p>
+              </div>
+            </div>
+          </div>
+          <div className="h-[600px]">
+            <ClaudeChatInterface
+              workspaceId={workspace.id}
+              executionId={execution.id}
+              initialMessages={messages.filter(
+                (m) => m.type === "chat_message" || m.type === "chat_response" || m.type === "chat_error"
+              )}
+            />
+          </div>
+        </div>
       </div>
     </div>
   );
