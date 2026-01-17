@@ -154,11 +154,16 @@ process_feedback() {
     log "Command: claude \"$prompt_content\""
 
     # Execute Claude Code
-    # Note: Claude Code is interactive, so we need to handle it appropriately
-    # For now, we'll use a simple approach with timeout and capturing output
+    # Use --continue to resume the most recent conversation in this directory
+    # This maintains context across executions for the same pattern workspace
+    # Note: Claude Code is interactive, so we pipe the prompt via stdin
 
-    if echo "$prompt_content" | timeout 600 claude --dangerously-skip-permissions > "$claude_output_file" 2> "$claude_error_file"; then
+    if echo "$prompt_content" | timeout 600 claude --continue --dangerously-skip-permissions > "$claude_output_file" 2> "$claude_error_file"; then
         log_success "Claude Code execution completed successfully"
+
+        # Store Claude output in status file
+        local status_file="$STATUS_DIR/$execution_id.json"
+        local claude_output_base64=$(base64 -w 0 "$claude_output_file" 2>/dev/null || base64 "$claude_output_file")
 
         # Update status to testing
         update_status "$execution_id" "running" "testing" 70 "Running tests"
@@ -167,6 +172,10 @@ process_feedback() {
         if git diff --quiet && git diff --cached --quiet; then
             log_warn "No changes detected. Claude may not have made any modifications."
             update_status "$execution_id" "completed" "done" 100 "No changes needed"
+
+            # Add Claude output to final status
+            local final_status=$(cat "$status_file" | sed "s/\"timestamp\":/\"claudeOutput\": \"$claude_output_base64\", \"timestamp\":/")
+            echo "$final_status" > "$status_file"
         else
             log_success "Changes detected. Proceeding with commit."
 
@@ -176,10 +185,9 @@ process_feedback() {
             # Update status with commit info
             update_status "$execution_id" "running" "deploying" 80 "Changes committed: $commit_hash"
 
-            # Store commit hash in status file for deploy monitor
-            local status_file="$STATUS_DIR/$execution_id.json"
-            local json_with_commit=$(cat "$status_file" | sed "s/\"timestamp\":/\"commitHash\": \"$commit_hash\", \"timestamp\":/" )
-            echo "$json_with_commit" > "$status_file"
+            # Store commit hash and Claude output in status file for deploy monitor
+            local json_with_data=$(cat "$status_file" | sed "s/\"timestamp\":/\"commitHash\": \"$commit_hash\", \"claudeOutput\": \"$claude_output_base64\", \"timestamp\":/")
+            echo "$json_with_data" > "$status_file"
 
             log_success "Commit hash: $commit_hash"
 

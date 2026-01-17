@@ -39,7 +39,7 @@ async function processStatusUpdate(filename: string) {
     const content = fs.readFileSync(filePath, "utf8");
     const statusData = JSON.parse(content);
 
-    const { executionId, status, phase, progress, data, error } = statusData;
+    const { executionId, status, phase, progress, message, data, error, commitHash, claudeOutput } = statusData;
 
     if (!executionId) {
       console.error(`[ERROR] Status file missing executionId: ${filename}`);
@@ -70,6 +70,23 @@ async function processStatusUpdate(filename: string) {
     if (error) {
       updateData.error = error;
       updateData.erroredAt = new Date();
+    }
+
+    // Handle Claude output (base64 encoded)
+    if (claudeOutput) {
+      try {
+        const decodedOutput = Buffer.from(claudeOutput, "base64").toString("utf-8");
+        updateData.claudeOutput = decodedOutput;
+        updateData.sessionResumed = true; // Mark as resumed since we used --continue
+        console.log(`[OUTPUT] Saved Claude output (${decodedOutput.length} chars)`);
+      } catch (e) {
+        console.error(`[ERROR] Failed to decode Claude output:`, e);
+      }
+    }
+
+    // Handle commit hash from status file
+    if (commitHash) {
+      updateData.commitHash = commitHash;
     }
 
     // Handle completion
