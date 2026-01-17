@@ -13,6 +13,11 @@ import { PrismaClient } from "@prisma/client";
 import * as fs from "fs";
 import * as path from "path";
 import { watch } from "fs";
+import {
+  notifyExecutionFailure,
+  notifyClaudeLogout,
+  notifyRepeatedFailures,
+} from "../src/lib/email";
 
 const prisma = new PrismaClient();
 
@@ -150,6 +155,75 @@ async function processStatusUpdate(filename: string) {
       // (Keep them in submitted_for_review status so they can be picked up again)
       if (execution.sessionIds.length > 0) {
         // Don't change status - let them remain submitted_for_review for retry
+      }
+
+      // Send email notification for failure
+      try {
+        await notifyExecutionFailure({
+          workspaceName: execution.workspace.name,
+          patternType: execution.workspace.patternType,
+          error: error || "Execution failed",
+          executionId: execution.id,
+          retryCount: execution.retryCount,
+        });
+        console.log("[EMAIL] Sent execution failure notification");
+      } catch (emailError) {
+        console.error("[EMAIL] Failed to send failure notification:", emailError);
+      }
+
+      // Check for Claude logout (common error patterns)
+      const isLogoutError =
+        error &&
+        (error.includes("authentication") ||
+          error.includes("not logged in") ||
+          error.includes("ENOENT") && error.includes("claude") ||
+          error.includes("command not found: claude"));
+
+      if (isLogoutError) {
+        try {
+          await notifyClaudeLogout();
+          console.log("[EMAIL] Sent Claude logout notification");
+        } catch (emailError) {
+          console.error("[EMAIL] Failed to send logout notification:", emailError);
+        }
+      }
+
+      // Check for repeated failures (3+ consecutive failures)
+      try {
+        const recentExecutions = await prisma.claudeExecution.findMany({
+          where: {
+            workspaceId: execution.workspaceId,
+          },
+          orderBy: {
+            triggeredAt: "desc",
+          },
+          take: 5,
+          include: {
+            workspace: {
+              select: {
+                name: true,
+              },
+            },
+          },
+        });
+
+        const consecutiveFailures = recentExecutions
+          .filter((exec) => exec.status === "failed")
+          .slice(0, 3);
+
+        if (consecutiveFailures.length >= 3) {
+          await notifyRepeatedFailures({
+            failureCount: consecutiveFailures.length,
+            recentFailures: consecutiveFailures.map((exec) => ({
+              workspaceName: exec.workspace.name,
+              error: exec.error || "Unknown error",
+              failedAt: exec.erroredAt?.toISOString() || exec.triggeredAt.toISOString(),
+            })),
+          });
+          console.log("[EMAIL] Sent repeated failures notification");
+        }
+      } catch (emailError) {
+        console.error("[EMAIL] Failed to check for repeated failures:", emailError);
       }
     } else if (progress !== undefined && progress > 0) {
       messageData.type = "execution_progress";

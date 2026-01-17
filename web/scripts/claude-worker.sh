@@ -206,16 +206,46 @@ process_feedback() {
         log_error "Claude Code execution failed with exit code: $exit_code"
 
         # Log error output
+        local error_message="Claude Code execution failed"
         if [ -s "$claude_error_file" ]; then
             log_error "Claude error output:"
             cat "$claude_error_file" | tee -a "$WORKER_LOG"
+            error_message=$(cat "$claude_error_file")
         fi
 
-        # Update status to failed
-        update_status "$execution_id" "failed" "error" 0 "Claude Code execution failed"
+        # Check if this is a transient error that should be retried
+        local is_transient=false
+        if echo "$error_message" | grep -qi "ECONNREFUSED\|ETIMEDOUT\|ENOTFOUND\|network\|connection"; then
+            is_transient=true
+            log_warn "Detected transient network error, marking for retry"
+        elif echo "$error_message" | grep -qi "timeout\|timed out"; then
+            is_transient=true
+            log_warn "Detected timeout error, marking for retry"
+        elif [ $exit_code -eq 124 ]; then
+            # Exit code 124 is from timeout command
+            is_transient=true
+            log_warn "Execution timed out, marking for retry"
+        fi
 
-        # Archive the feedback file as failed
-        mv "$feedback_file" "$feedback_file.failed"
+        if [ "$is_transient" = true ]; then
+            # Update status to retry (will be picked up again)
+            update_status "$execution_id" "retry" "error" 0 "Transient error, will retry"
+
+            # Move file back to queue for retry (add .retry suffix to track attempts)
+            local retry_count=$(ls "$feedback_file".retry.* 2>/dev/null | wc -l)
+            if [ $retry_count -lt 3 ]; then
+                mv "$feedback_file" "$feedback_file.retry.$retry_count"
+                log "Feedback file marked for retry (attempt $((retry_count + 1))/3)"
+            else
+                log_error "Maximum retry attempts (3) reached, marking as failed"
+                update_status "$execution_id" "failed" "error" 0 "Max retries exceeded: $error_message"
+                mv "$feedback_file" "$feedback_file.failed"
+            fi
+        else
+            # Permanent failure
+            update_status "$execution_id" "failed" "error" 0 "$error_message"
+            mv "$feedback_file" "$feedback_file.failed"
+        fi
 
         return 1
     fi
@@ -234,7 +264,7 @@ watch_feedback_queue() {
 
     while true; do
         # Find unprocessed JSON files in feedback queue
-        for feedback_file in "$FEEDBACK_QUEUE_DIR"/*.json; do
+        for feedback_file in "$FEEDBACK_QUEUE_DIR"/*.json "$FEEDBACK_QUEUE_DIR"/*.json.retry.*; do
             # Check if glob matched any files
             [ -e "$feedback_file" ] || continue
 
@@ -243,8 +273,15 @@ watch_feedback_queue() {
                 continue
             fi
 
-            # Process the feedback
-            log "Found new feedback: $(basename "$feedback_file")"
+            # For retry files, rename back to .json before processing
+            if [[ "$feedback_file" == *.retry.* ]]; then
+                local base_file="${feedback_file%.retry.*}.json"
+                log "Found retry file: $(basename "$feedback_file")"
+                log "Retrying execution after transient error..."
+                # Don't rename yet, process with retry name to track attempts
+            else
+                log "Found new feedback: $(basename "$feedback_file")"
+            fi
 
             if process_feedback "$feedback_file"; then
                 log_success "Successfully processed feedback"
